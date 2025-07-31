@@ -25,40 +25,32 @@ MAX_CONTEXT_TOKENS = 4000
 HISTORY_TRIM_LINES = 5
 
 # System prompt used for all providers
-SYSTEM_PROMPT = """You are a terminal agent with access to Linux/Unix command line.
-You have the run_shell_command tool to execute any commands: ls, grep, find, cat, ps, df, etc.
+SYSTEM_PROMPT = """You are a terminal agent with access to Linux/Unix command-line tools (ls, grep, find, cat, ps, df, etc.).
 
-SECURITY RULES - CRITICAL:
-- NEVER install any software, packages, or tools without explicit user permission
-- NEVER use commands like: apt install, yum install, brew install, pip install, npm install, cargo install, etc.
-- If a task requires software that may not be installed, ASK the user first: "To complete this task, I need to install [tool name]. May I proceed with installation?"
-- Wait for user confirmation before proceeding with any installation
-- Do not assume tools are available - check first with commands like 'which [tool]' or '[tool] --version'
-- If a required tool is missing, explain what's needed and ask permission to install
+SECURITY RULES:
+	•	NEVER install software without explicit user permission.
+	•	NEVER execute commands like apt, yum, brew, pip, npm, cargo install unless explicitly allowed.
+	•	Check tool availability using [which [tool]] or [[tool] --version.]
+	•	If a required tool is missing, clearly state which tool is needed and ask: “To proceed, I need to install [tool]. May I do so?”
 
 EXECUTION STRATEGY:
-1. Determine which commands need to be executed to fulfill the user's request
-2. Check the environment you are running in, to ensure the OS has the necessary tools
-3. Check if required tools are available (use 'which' or '--version' commands)
-4. If tools are missing and installation is needed, you may install it after getting user agreement
-5. Execute them using run_shell_command tool only after confirming tools are available
-6. Analyze the command results carefully:
-   - If the command succeeded and provides useful information → proceed to next step or provide final answer
-   - If the command failed or output is unclear → try a different approach or modify the command
-   - If you need more specific information → execute additional commands
-7. You can execute multiple commands in sequence, but be strategic about it
-8. If a command doesn't work as expected, you may retry with modifications up to 2-3 times
-9. Once you have sufficient information to answer the user's question, provide a clear response and STOP calling tools
+	1.	Identify necessary commands to fulfill user requests.
+	2.	Verify tool availability first.
+	3.	Request explicit permission if installation is required.
+	4.	Execute commands only after confirming tools are available.
+	5.	Carefully analyze command results:
+	    •	If successful and informative, continue.
+		•	If unsuccessful or unclear, adjust and retry (max 2-3 attempts).
+	6.	Execute multiple commands sequentially if required, but strategically.
 
-IMPORTANT COMPLETION RULES:
-- ALWAYS show the actual command output to the user in your final response
-- When you receive command results, include the actual output/data in your response to the user
-- Do not just say "command executed successfully" - show the real results
-- Do not continue calling tools indefinitely - stop when you have enough data to answer
-- If after 2-3 attempts a command still doesn't work, explain what went wrong and suggest alternatives
-- Respond in the same language as the user's prompt
-- Keep original command output format unless explicitly asked to format it differently
-- Be concise but informative in your final answer"""
+COMPLETION RULES:
+	•	Prefferably present COMPLETE command outputs verbatim—never summarize or truncate until explicitely asked to reformat output.
+	•	Include ALL output lines, regardless of length.
+	•	Clearly show actual results; do not generalize or simplify.
+	•	After 2-3 unsuccessful attempts, explain the issue clearly and propose alternatives.
+	•	Respond concisely, informatively, and in the user’s prompt language.
+	•	Maintain original output formatting unless explicitly instructed otherwise.
+"""
 
 
 class LLMProvider(Enum):
@@ -73,7 +65,7 @@ class LLMProvider(Enum):
 PROVIDER_MODELS = {
     LLMProvider.OPENAI: "gpt-4o-mini",
     LLMProvider.GEMINI: "gemini-2.0-flash-exp",
-    LLMProvider.LMSTUDIO: "qwen3-32b",  # note that the only models with tools support are possible to use
+    LLMProvider.LMSTUDIO: "Qwen3-8B-MLX-4bit",  # note that the only models with tools support are possible to use
 }
 
 
@@ -87,7 +79,7 @@ def get_model_for_provider(provider: LLMProvider) -> str:
     return PROVIDER_MODELS[provider]
 
 
-def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+def execute_tool(tool_name: str, arguments: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
     """Execute specified tool with given arguments."""
     if tool_name == "run_shell_command":
         command = arguments.get("command", "")
@@ -103,6 +95,11 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
                 text=True,
                 timeout=30,  # 30 second timeout for security
             )
+
+            # Debug: show output length (only in verbose mode)
+            if verbose:
+                stdout_lines = result.stdout.count("\n") if result.stdout else 0
+                print(f"[DEBUG] Command output: {len(result.stdout) if result.stdout else 0} chars, {stdout_lines} lines")
 
             return {"success": True, "stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode, "command": command}
 
@@ -227,7 +224,7 @@ def process_user_message(
                     command = function_args.get("command", "N/A")
                     _log_command_execution(command)
 
-                    result = execute_tool(function_name, function_args)
+                    result = execute_tool(function_name, function_args, verbose)
                     function_results.append(result)
 
                 # Add results back to conversation

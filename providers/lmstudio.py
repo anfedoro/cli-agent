@@ -58,7 +58,13 @@ def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], mod
     """Send message to LM Studio API using OpenAI format."""
     model_to_use = model_name if model_name else get_model_name()
     tools = get_available_tools()
-    return client.chat.completions.create(model=model_to_use, messages=messages, tools=tools, tool_choice="auto")  # type: ignore
+    return client.chat.completions.create(
+        model=model_to_use,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        max_tokens=4096,  # Increase token limit for longer responses
+    )  # type: ignore
 
 
 def extract_function_calls(response) -> List[Dict[str, Any]]:

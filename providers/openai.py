@@ -54,7 +54,13 @@ def get_display_name(model_name: str) -> str:
 def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: str = None) -> Any:
     """Send message to OpenAI API and return response."""
     model_to_use = model_name if model_name else get_model_name()
-    return client.chat.completions.create(model=model_to_use, messages=messages, tools=get_available_tools(), tool_choice="auto")
+    return client.chat.completions.create(
+        model=model_to_use,
+        messages=messages,
+        tools=get_available_tools(),
+        tool_choice="auto",
+        max_tokens=4096,  # Increase token limit for longer responses
+    )
 
 
 def extract_function_calls(response) -> List[Dict[str, Any]]:
