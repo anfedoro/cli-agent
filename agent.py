@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 from dotenv import load_dotenv
 
+from input_handler import cleanup_input_handler, enhanced_input, is_readline_available
 from providers import (
     ADD_FUNCTION_RESULT_TO_MESSAGES,
     EXTRACT_FUNCTION_CALLS,
@@ -72,7 +73,7 @@ class LLMProvider(Enum):
 PROVIDER_MODELS = {
     LLMProvider.OPENAI: "gpt-4o-mini",
     LLMProvider.GEMINI: "gemini-2.0-flash-exp",
-    LLMProvider.LMSTUDIO: "qwen3-30b-a3b-2507",
+    LLMProvider.LMSTUDIO: "qwen3-32b",  # note that the only models with tools support are possible to use
 }
 
 
@@ -299,9 +300,16 @@ def main(verbose: bool = False, provider: str = "openai", model: str | None = No
     # Initialize chat history
     chat_history = {"lines": [], "total_tokens": 0}
 
+    # Show input handler status in verbose mode
+    if verbose:
+        if is_readline_available():
+            print("[DEBUG] Readline: enabled, command history available")
+        else:
+            print("[DEBUG] Readline: not available (basic input mode)")
+
     while True:
         try:
-            user_input = input("\nUser: ").strip()
+            user_input = enhanced_input("\nUser: ").strip()
 
             if user_input.lower() in ["quit", "exit", "q"]:
                 print("Goodbye!")
@@ -340,6 +348,9 @@ def main(verbose: bool = False, provider: str = "openai", model: str | None = No
             break
         except Exception as e:
             print(f"\nAn error occurred: {e}")
+
+    # Cleanup input handler before exit
+    cleanup_input_handler()
 
 
 if __name__ == "__main__":
