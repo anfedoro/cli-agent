@@ -48,9 +48,9 @@ def get_model_name() -> str:
     return "gemini-2.0-flash-exp"
 
 
-def get_display_name() -> str:
-    """Get the display name for Gemini."""
-    return "Google Gemini 2.0 Flash (OpenAI API)"
+def get_display_name(model_name: str) -> str:
+    """Get the display name for Gemini with the specified model."""
+    return f"Google Gemini - Model: {model_name}"
 
 
 def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: str = None) -> Any:

@@ -46,9 +46,9 @@ def get_model_name() -> str:
     return "gpt-4o-mini"
 
 
-def get_display_name() -> str:
-    """Get the display name for OpenAI."""
-    return "OpenAI GPT-4o-mini"
+def get_display_name(model_name: str) -> str:
+    """Get the display name for OpenAI with the specified model."""
+    return f"OpenAI - Model: {model_name}"
 
 
 def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: str = None) -> Any:

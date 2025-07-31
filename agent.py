@@ -142,9 +142,9 @@ def get_available_tools(provider: LLMProvider) -> List[Any]:
     return GET_AVAILABLE_TOOLS[provider.value]()
 
 
-def get_display_name(provider: LLMProvider) -> str:
-    """Get display name for the specified provider."""
-    return GET_DISPLAY_NAME[provider.value]()
+def get_display_name(provider: LLMProvider, model_name: str) -> str:
+    """Get display name for the specified provider with model name."""
+    return GET_DISPLAY_NAME[provider.value](model_name)
 
 
 def process_user_message(
@@ -183,7 +183,8 @@ def process_user_message(
                 print(f"[DEBUG] Iteration {iteration}/{max_iterations}")
 
             # Send message to provider
-            response = SEND_MESSAGE[provider.value](client_or_model, messages)
+            current_model = get_model_for_provider(provider)
+            response = SEND_MESSAGE[provider.value](client_or_model, messages, current_model)
 
             # Extract usage information
             usage_info = EXTRACT_USAGE_INFO[provider.value](response)
@@ -271,7 +272,7 @@ def main(verbose: bool = False, provider: str = "openai", model: str = None) -> 
 
         client_or_model = initialize_client(llm_provider)
         current_model = get_model_for_provider(llm_provider)
-        print(f"Using {get_display_name(llm_provider)} - Model: {current_model}")
+        print(f"Using {get_display_name(llm_provider, current_model)}")
 
     except ValueError as e:
         print(f"Error: {e}")
