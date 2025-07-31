@@ -70,6 +70,13 @@ Run the agent in interactive terminal mode:
 python main.py
 ```
 
+or for debug messages and tocken consumption control:
+
+```bash
+python main.py --verbose
+```
+
+
 Example interactions:
 - "Show files in current directory"
 - "Find all Python files and count lines of code"
@@ -115,18 +122,10 @@ The agent exposes a single tool `run_shell_command` with JSON schema specificati
 
 ### Safety Measures
 
-- 30-second timeout on command execution
 - Limited iteration count (5 max) to prevent infinite loops
 - Subprocess isolation
 - Error handling and graceful degradation
 
-## Testing
-
-Run the test suite:
-
-```bash
-pytest tests/
-```
 
 Tests cover:
 - Tool definition and execution
