@@ -37,7 +37,7 @@ SECURITY RULES - CRITICAL:
 EXECUTION STRATEGY:
 1. Determine which commands need to be executed to fulfill the user's request
 2. Check if required tools are available (use 'which' or '--version' commands)
-3. If tools are missing and installation is needed, ASK USER PERMISSION FIRST
+3. If tools are missing and installation is needed, you may install it after getting user agreement
 4. Execute them using run_shell_command tool only after confirming tools are available
 5. Analyze the command results carefully:
    - If the command succeeded and provides useful information → proceed to next step or provide final answer
