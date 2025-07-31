@@ -14,6 +14,7 @@ from providers import (
     INITIALIZE_CLIENT,
     SEND_MESSAGE,
 )
+from utils import format_system_context
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,16 +37,17 @@ SECURITY RULES - CRITICAL:
 
 EXECUTION STRATEGY:
 1. Determine which commands need to be executed to fulfill the user's request
-2. Check if required tools are available (use 'which' or '--version' commands)
-3. If tools are missing and installation is needed, you may install it after getting user agreement
-4. Execute them using run_shell_command tool only after confirming tools are available
-5. Analyze the command results carefully:
+2. Check the environment you are running in, to ensure the OS has the necessary tools
+3. Check if required tools are available (use 'which' or '--version' commands)
+4. If tools are missing and installation is needed, you may install it after getting user agreement
+5. Execute them using run_shell_command tool only after confirming tools are available
+6. Analyze the command results carefully:
    - If the command succeeded and provides useful information → proceed to next step or provide final answer
    - If the command failed or output is unclear → try a different approach or modify the command
    - If you need more specific information → execute additional commands
-6. You can execute multiple commands in sequence, but be strategic about it
-7. If a command doesn't work as expected, you may retry with modifications up to 2-3 times
-8. Once you have sufficient information to answer the user's question, provide a clear response and STOP calling tools
+7. You can execute multiple commands in sequence, but be strategic about it
+8. If a command doesn't work as expected, you may retry with modifications up to 2-3 times
+9. Once you have sufficient information to answer the user's question, provide a clear response and STOP calling tools
 
 IMPORTANT COMPLETION RULES:
 - ALWAYS show the actual command output to the user in your final response
@@ -63,12 +65,14 @@ class LLMProvider(Enum):
 
     OPENAI = "openai"
     GEMINI = "gemini"
+    LMSTUDIO = "lmstudio"
 
 
 # Global configuration for models by provider
 PROVIDER_MODELS = {
     LLMProvider.OPENAI: "gpt-4o-mini",
     LLMProvider.GEMINI: "gemini-2.0-flash-exp",
+    LLMProvider.LMSTUDIO: "qwen3-30b-a3b-2507",
 }
 
 
@@ -157,11 +161,21 @@ def process_user_message(
 ) -> Union[str, Tuple[str, Dict[str, Any]]]:
     """Process user message through the specified provider using unified agent loop."""
 
+    # Add system context to help agent adapt to current environment
+    system_context = format_system_context()
+
     # Include history context if available
     full_prompt = user_prompt
     if history and history["lines"]:
         history_text = format_history_for_prompt(history)
         full_prompt = f"{history_text}\nUser: {user_prompt}"
+
+    # Prepend system context to the user prompt
+    full_prompt = f"{system_context}\n\nUser request: {full_prompt}"
+
+    # Debug: print system context being added
+    if verbose:
+        print(f"[DEBUG] Adding system context: {system_context}")
 
     try:
         max_iterations = 5
@@ -173,7 +187,7 @@ def process_user_message(
 
         messages: List[ChatCompletionMessageParam] = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": full_prompt}]
 
-        if provider not in [LLMProvider.OPENAI, LLMProvider.GEMINI]:
+        if provider not in [LLMProvider.OPENAI, LLMProvider.GEMINI, LLMProvider.LMSTUDIO]:
             raise ValueError(f"Unsupported provider: {provider}")
 
         # Main agent loop
@@ -243,12 +257,12 @@ def process_user_message(
         return (error_msg, {}) if return_usage else error_msg
 
 
-def main(verbose: bool = False, provider: str = "openai", model: str = None) -> None:
+def main(verbose: bool = False, provider: str = "openai", model: str | None = None) -> None:
     """Main function for interactive agent communication.
 
     Args:
         verbose: Show detailed token usage information
-        provider: LLM provider to use ("openai" or "gemini")
+        provider: LLM provider to use ("openai", "gemini", or "lmstudio")
         model: Model name to use for the selected provider (optional)
     """
     print(f"LLM Terminal Agent started with {provider.upper()} provider!")
@@ -266,8 +280,12 @@ def main(verbose: bool = False, provider: str = "openai", model: str = None) -> 
             llm_provider = LLMProvider.GEMINI
             if model:
                 set_model_for_provider(llm_provider, model)
+        elif provider == "lmstudio":
+            llm_provider = LLMProvider.LMSTUDIO
+            if model:
+                set_model_for_provider(llm_provider, model)
         else:
-            print(f"Error: Unsupported provider '{provider}'. Use 'openai' or 'gemini'.")
+            print(f"Error: Unsupported provider '{provider}'. Use 'openai', 'gemini', or 'lmstudio'.")
             return
 
         client_or_model = initialize_client(llm_provider)

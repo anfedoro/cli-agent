@@ -35,7 +35,7 @@ This is a **learning and experimentation project** focused on understanding core
 
 ## Features
 
-- **Multiple Provider Support**: Choose between OpenAI and Google Gemini APIs
+- **Multiple Provider Support**: Choose between OpenAI, Google Gemini, and LM Studio APIs
 - **Unified API Interface**: Both providers use OpenAI-compatible format for consistency
 - **Security Controls**: Prevents automatic software installation without user permission
 - **Execute terminal commands**: `ls`, `grep`, `find`, `ps`, `cat`, `tail`, `df`, etc.
@@ -85,12 +85,24 @@ export OPENAI_API_KEY=your_openai_api_key_here
 export GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
+### For LM Studio
+
+1. Download and install LM Studio from https://lmstudio.ai/
+
+2. Load a model in LM Studio and start the local server
+
+3. (Optional) Configure custom base URL if not using default:
+```bash
+export LM_STUDIO_BASE_URL=http://localhost:1234/v1
+```
+
 ### Environment File
 
 You can also create a `.env` file in the project root:
 ```bash
 OPENAI_API_KEY=your_openai_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
+LM_STUDIO_BASE_URL=http://localhost:1234/v1
 ```
 
 ## Usage
@@ -104,11 +116,17 @@ python main.py
 # Use Gemini
 python main.py --provider gemini
 
+# Use LM Studio
+python main.py --provider lmstudio
+
 # Use custom model
 python main.py --provider openai --model gpt-3.5-turbo
 
 # Enable verbose mode for debugging
 python main.py --verbose --provider gemini
+
+# Use custom model with LM Studio
+python main.py --provider lmstudio --model your-model-name
 ```
 
 ### Command Line Options
@@ -118,7 +136,7 @@ python main.py --help
 ```
 
 Options:
-- `--provider {openai,gemini}` or `-p`: Choose LLM provider (default: openai)
+- `--provider {openai,gemini,lmstudio}` or `-p`: Choose LLM provider (default: openai)
 - `--model MODEL` or `-m`: Specify model name for the selected provider
 - `--verbose` or `-v`: Show detailed token usage and debug information
 - `--help` or `-h`: Show help message
@@ -168,6 +186,15 @@ client = initialize_client(LLMProvider.GEMINI)
 response = process_user_message(
     "List all running processes",
     LLMProvider.GEMINI,
+    client
+)
+print(response)
+
+# Using LM Studio (requires LM Studio running locally)
+client = initialize_client(LLMProvider.LMSTUDIO)
+response = process_user_message(
+    "List all running processes",
+    LLMProvider.LMSTUDIO,
     client
 )
 print(response)
@@ -403,6 +430,12 @@ This project helps understand:
 - **API**: Google's OpenAI-compatible endpoint
 - **Environment Variable**: `GEMINI_API_KEY`
 
+### LM Studio
+- **Model**: qwen3-30b-a3b-2507 (default), customizable
+- **API**: Local OpenAI-compatible endpoint
+- **Environment Variable**: `LM_STUDIO_BASE_URL` (optional, defaults to http://localhost:1234/v1)
+- **Requirements**: LM Studio application running locally with a loaded model
+
 ## Limitations
 
 - Single tool implementation (shell commands only)
@@ -427,7 +460,7 @@ This project helps understand:
 
 This basic implementation can be extended to explore:
 
-- Additional LLM providers (Anthropic Claude, local models, etc.)
+- Additional LLM providers (Anthropic Claude, etc.)
 - Multiple tool types (file operations, web requests, database queries)
 - Persistent conversation memory
 - Advanced planning algorithms
