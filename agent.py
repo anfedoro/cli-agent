@@ -15,14 +15,19 @@ from providers import (
     INITIALIZE_CLIENT,
     SEND_MESSAGE,
 )
+from providers.lmstudio import is_no_reasoning, set_no_reasoning
 from utils import format_system_context
 
 # Load environment variables from .env file
 load_dotenv()
 
+# Configuration constants for the agent
+# Maximum number of iterations for the agent to refine its response
+MAX_AGENT_ITERATIONS = 10
+
 # Configuration constants for history management
 MAX_CONTEXT_TOKENS = 4000
-HISTORY_TRIM_LINES = 5
+HISTORY_TRIM_LINES = 2
 
 # System prompt used for all providers
 SYSTEM_PROMPT = """You are a terminal agent with access to Linux/Unix command-line tools (ls, grep, find, cat, ps, df, etc.).
@@ -86,6 +91,14 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any], verbose: bool = Fals
         if not command:
             return {"success": False, "error": "Command not specified"}
 
+        # Get timeout from LLM estimation or use default
+        estimated_timeout = arguments.get("estimated_timeout", 30)
+        # Ensure timeout is within reasonable bounds
+        timeout = max(5, min(300, estimated_timeout))
+
+        if verbose:
+            print(f"[DEBUG] Using timeout: {timeout}s (estimated: {estimated_timeout}s)")
+
         try:
             # Execute command through shell
             result = subprocess.run(
@@ -93,7 +106,7 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any], verbose: bool = Fals
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=30,  # 30 second timeout for security
+                timeout=timeout,
             )
 
             # Debug: show output length (only in verbose mode)
@@ -104,7 +117,7 @@ def execute_tool(tool_name: str, arguments: Dict[str, Any], verbose: bool = Fals
             return {"success": True, "stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode, "command": command}
 
         except subprocess.TimeoutExpired:
-            return {"success": False, "error": "Command execution timeout exceeded (30 sec)"}
+            return {"success": False, "error": f"Command execution timeout exceeded ({timeout} sec)"}
         except Exception as e:
             return {"success": False, "error": f"Command execution error: {str(e)}"}
 
@@ -166,7 +179,7 @@ def process_user_message(
     full_prompt = user_prompt
     if history and history["lines"]:
         history_text = format_history_for_prompt(history)
-        full_prompt = f"{history_text}\nUser: {user_prompt}"
+        full_prompt = f"{history_text}\n{user_prompt}"
 
     # Prepend system context to the user prompt
     full_prompt = f"{system_context}\n\nUser request: {full_prompt}"
@@ -176,7 +189,7 @@ def process_user_message(
         print(f"[DEBUG] Adding system context: {system_context}")
 
     try:
-        max_iterations = 5
+        max_iterations = MAX_AGENT_ITERATIONS
         iteration = 0
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
@@ -255,13 +268,14 @@ def process_user_message(
         return (error_msg, {}) if return_usage else error_msg
 
 
-def main(verbose: bool = False, provider: str = "openai", model: str | None = None) -> None:
+def main(verbose: bool = False, provider: str = "openai", model: str | None = None, no_reasoning: bool = False) -> None:
     """Main function for interactive agent communication.
 
     Args:
         verbose: Show detailed token usage information
         provider: LLM provider to use ("openai", "gemini", or "lmstudio")
         model: Model name to use for the selected provider (optional)
+        no_reasoning: Disable reasoning process for faster responses (LM Studio)
     """
     print(f"LLM Terminal Agent started with {provider.upper()} provider!")
     print("You can ask to execute any Linux commands: ls, grep, find, ps, etc.")
@@ -290,6 +304,10 @@ def main(verbose: bool = False, provider: str = "openai", model: str | None = No
         current_model = get_model_for_provider(llm_provider)
         print(f"Using {get_display_name(llm_provider, current_model)}")
 
+        if no_reasoning and llm_provider == LLMProvider.LMSTUDIO:
+            set_no_reasoning(True)
+            print("[INFO] Reasoning disabled for faster responses")
+
     except ValueError as e:
         print(f"Error: {e}")
         return
@@ -311,6 +329,10 @@ def main(verbose: bool = False, provider: str = "openai", model: str | None = No
             if user_input.lower() in ["quit", "exit", "q"]:
                 print("Goodbye!")
                 break
+            if user_input.lower() in ["/clear"]:
+                print("Clearing chat history...")
+                chat_history = {"lines": [], "total_tokens": 0}
+                continue
 
             if not user_input:
                 continue
@@ -318,10 +340,17 @@ def main(verbose: bool = False, provider: str = "openai", model: str | None = No
             print("Agent is analyzing request...")
             add_to_history(chat_history, f"User: {user_input}")
 
+            if is_no_reasoning():
+                user_input = f"/nothink\n{user_input}"
+
             if verbose:
                 response, usage_info = process_user_message(user_input, llm_provider, client_or_model, chat_history, return_usage=True, verbose=True)
             else:
                 response = process_user_message(user_input, llm_provider, client_or_model, chat_history, return_usage=False, verbose=False)
+
+            # some models add \n\n at the beginning of the response, thus we remove it
+            if response.startswith("\n\n"):
+                response = response[2:]
 
             add_to_history(chat_history, f"Agent: {response}")
             print(f"\nAgent: {response}")

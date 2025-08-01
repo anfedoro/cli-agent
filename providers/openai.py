@@ -24,7 +24,14 @@ def get_available_tools() -> List[Dict[str, Any]]:
                         "command": {
                             "type": "string",
                             "description": "Shell command to execute, e.g. 'ls -la /tmp' or 'grep -r \"pattern\" .'",
-                        }
+                        },
+                        "estimated_timeout": {
+                            "type": "integer",
+                            "description": "Estimated timeout in seconds (5-300). Consider command complexity: find/du operations need 60-300s, simple commands like ls/ps need 5-30s",
+                            "minimum": 5,
+                            "maximum": 300,
+                            "default": 30,
+                        },
                     },
                     "required": ["command"],
                 },

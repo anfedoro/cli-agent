@@ -9,6 +9,20 @@ from openai.types.chat import ChatCompletionMessageParam
 # Load environment variables
 load_dotenv()
 
+# Global configuration for reasoning
+_no_reasoning = False
+
+
+def set_no_reasoning(value: bool):
+    """Set global no_reasoning configuration."""
+    global _no_reasoning
+    _no_reasoning = value
+
+
+def is_no_reasoning() -> bool:
+    """Check if reasoning is disabled globally."""
+    return _no_reasoning
+
 
 def get_available_tools() -> List[Dict[str, Any]]:
     """Return available tool definitions for LM Studio API using OpenAI format."""
@@ -24,7 +38,14 @@ def get_available_tools() -> List[Dict[str, Any]]:
                         "command": {
                             "type": "string",
                             "description": "Shell command to execute, e.g. 'ls -la /tmp' or 'grep -r \"pattern\" .'",
-                        }
+                        },
+                        "estimated_timeout": {
+                            "type": "integer",
+                            "description": "Estimated timeout in seconds (5-300). Consider command complexity: find/du operations need 60-300s, simple commands like ls/ps need 5-30s",
+                            "minimum": 5,
+                            "maximum": 300,
+                            "default": 30,
+                        },
                     },
                     "required": ["command"],
                 },
@@ -58,12 +79,22 @@ def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], mod
     """Send message to LM Studio API using OpenAI format."""
     model_to_use = model_name if model_name else get_model_name()
     tools = get_available_tools()
+
+    # # Configure reasoning based on global setting
+    # extra_body = {}
+    # if _no_reasoning:
+    #     extra_body = {
+    #         "reasoning": False,
+    #         "disable_reasoning": True,
+    #     }
+
     return client.chat.completions.create(
         model=model_to_use,
         messages=messages,
         tools=tools,
         tool_choice="auto",
         max_tokens=4096,  # Increase token limit for longer responses
+        # extra_body=extra_body if extra_body else None,  # Only add if needed
     )  # type: ignore
 
 
