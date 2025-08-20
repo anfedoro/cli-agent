@@ -36,7 +36,8 @@ SECURITY RULES:
 	•	NEVER install software without explicit user permission.
 	•	NEVER execute commands like apt, yum, brew, pip, npm, cargo install unless explicitly allowed.
 	•	Check tool availability using [which [tool]] or [[tool] --version.]
-	•	If a required tool is missing, clearly state which tool is needed and ask: “To proceed, I need to install [tool]. May I do so?”
+    •	ALWAYS use "which" command separately of other commands to let agent hide it from the output
+	•	If a required tool is missing, clearly state which tool is needed and ask: "To proceed, I need to install [tool]. May I do so?"
 
 EXECUTION STRATEGY:
 	1.	Identify necessary commands to fulfill user requests.
@@ -44,8 +45,9 @@ EXECUTION STRATEGY:
 	3.	Request explicit permission if installation is required.
 	4.	Execute commands only after confirming tools are available.
 	5.	Carefully analyze command results:
-	    •	If successful and informative, continue.
-		•	If unsuccessful or unclear, adjust and retry (max 2-3 attempts).
+	    •	If successful and enough to fulfill the request, shape the response and continue with no extra functions calls.
+		•	If unsuccessful or unclear, adjust and retry (max number of iterations is {MAX_AGENT_ITERATIONS}).
+        •	If no solution is found after {MAX_AGENT_ITERATIONS} attempts, explain the issue and suggest alternatives.
 	6.	Execute multiple commands sequentially if required, but strategically.
 
 COMPLETION RULES:
@@ -53,7 +55,7 @@ COMPLETION RULES:
 	•	Include ALL output lines, regardless of length.
 	•	Clearly show actual results; do not generalize or simplify.
 	•	After 2-3 unsuccessful attempts, explain the issue clearly and propose alternatives.
-	•	Respond concisely, informatively, and in the user’s prompt language.
+	•	Respond concisely, informatively, and in the user's prompt language.
 	•	Maintain original output formatting unless explicitly instructed otherwise.
 """
 
@@ -70,7 +72,7 @@ class LLMProvider(Enum):
 PROVIDER_MODELS = {
     LLMProvider.OPENAI: "gpt-5-mini",
     LLMProvider.GEMINI: "gemini-2.5-flash",
-    LLMProvider.LMSTUDIO: "Qwen3-8B-MLX-4bit",  # note that the only models with tools support are possible to use
+    LLMProvider.LMSTUDIO: "gpt-oss-20b",  # note that the only models with tools support are possible to use
 }
 
 
@@ -144,7 +146,7 @@ def format_history_for_prompt(history: Dict[str, Any]) -> str:
 
 def _log_command_execution(command: str) -> None:
     """Log command execution for debugging purposes."""
-    print(f"Executing command: {command}")
+    print(f"Executing command: {command}") if not command.startswith("which") else None  # Skip "which " prefix
 
 
 def initialize_client(provider: LLMProvider) -> Any:

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
+from ._shared import prepare_chat_completion_params
 
 # Load environment variables
 load_dotenv()
@@ -76,26 +77,11 @@ def get_display_name(model_name: str) -> str:
 
 
 def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: Optional[str] = None) -> Any:
-    """Send message to LM Studio API using OpenAI format."""
-    model_to_use = model_name if model_name else get_model_name()
-    tools = get_available_tools()
-
-    # # Configure reasoning based on global setting
-    # extra_body = {}
-    # if _no_reasoning:
-    #     extra_body = {
-    #         "reasoning": False,
-    #         "disable_reasoning": True,
-    #     }
-
-    return client.chat.completions.create(
-        model=model_to_use,
-        messages=messages,
-        tools=tools,
-        tool_choice="auto",
-        max_tokens=4096,  # Increase token limit for longer responses
-        # extra_body=extra_body if extra_body else None,  # Only add if needed
-    )  # type: ignore
+    """Send message to LM Studio API (unified logic)."""
+    model_to_use = model_name or get_model_name()
+    params = prepare_chat_completion_params("lmstudio", model_to_use, messages, get_available_tools())
+    # Potential future reasoning flags could be injected here based on _no_reasoning
+    return client.chat.completions.create(**params)  # type: ignore
 
 
 def extract_function_calls(response) -> List[Dict[str, Any]]:
