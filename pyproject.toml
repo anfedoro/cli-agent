@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cli-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "LLM Terminal Agent supporting multiple providers"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -11,4 +15,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0", "pytest-asyncio>=0.21.0"]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.scripts]
+cli-agent = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "agent", "input_handler", "utils"]
+
+[tool.setuptools.packages.find]
+include = ["providers"]
