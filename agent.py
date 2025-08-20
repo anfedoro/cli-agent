@@ -68,7 +68,7 @@ class LLMProvider(Enum):
 
 # Global configuration for models by provider
 PROVIDER_MODELS = {
-    LLMProvider.OPENAI: "gpt-4.1-mini",
+    LLMProvider.OPENAI: "gpt-5-mini",
     LLMProvider.GEMINI: "gemini-2.5-flash",
     LLMProvider.LMSTUDIO: "Qwen3-8B-MLX-4bit",  # note that the only models with tools support are possible to use
 }

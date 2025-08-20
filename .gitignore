@@ -11,3 +11,4 @@ wheels/
 
 # Tests (keep local only)
 tests/
+**/*.DS_Store**

@@ -64,9 +64,10 @@ def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], mod
     return client.chat.completions.create(
         model=model_to_use,
         messages=messages,
+        reasoning_effort="low",
         tools=get_available_tools(),
         tool_choice="auto",
-        max_tokens=4096,  # Increase token limit for longer responses
+        max_completion_tokens=4096,  # Increase token limit for longer responses
     )
 
 
