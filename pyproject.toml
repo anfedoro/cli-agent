@@ -24,7 +24,7 @@ dev = [
 cli-agent = "main:main"
 
 [tool.setuptools]
-py-modules = ["main", "agent", "input_handler", "utils"]
+py-modules = ["main", "agent", "input_handler", "utils", "shell_interface"]
 
 [tool.setuptools.packages.find]
 include = ["providers"]

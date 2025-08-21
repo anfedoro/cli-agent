@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-from ._shared import prepare_chat_completion_params
+from ._shared import prepare_chat_completion_params, extract_unsupported_parameter, is_parameter_error
 
 # Load environment variables
 load_dotenv()
@@ -49,21 +49,34 @@ def initialize_client() -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
-def get_model_name() -> str:
-    """Get the model name for OpenAI."""
-    return "gpt-4o-mini"
-
-
 def get_display_name(model_name: str) -> str:
     """Get the display name for OpenAI with the specified model."""
     return f"OpenAI - Model: {model_name}"
 
 
-def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: str | None = None) -> Any:
-    """Send message to OpenAI API (unified logic)."""
-    model_to_use = model_name or get_model_name()
-    params = prepare_chat_completion_params("openai", model_to_use, messages, get_available_tools())
-    return client.chat.completions.create(**params)
+def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: str) -> Any:
+    """Send message to OpenAI API with error handling for unsupported parameters."""
+    params = prepare_chat_completion_params("openai", model_name, messages, get_available_tools())
+
+    try:
+        return client.chat.completions.create(**params)
+    except Exception as e:
+        # Check if error is about unsupported parameter
+        if is_parameter_error(e):
+            unsupported_param = extract_unsupported_parameter(e)
+            if unsupported_param and unsupported_param in params:
+                # Remove unsupported parameter and retry
+                params_retry = params.copy()
+                del params_retry[unsupported_param]
+
+                try:
+                    return client.chat.completions.create(**params_retry)
+                except Exception:
+                    # If retry also fails, raise the original error
+                    raise e
+
+        # For other errors or if we couldn't identify the parameter, raise immediately
+        raise e
 
 
 def extract_function_calls(response) -> List[Dict[str, Any]]:

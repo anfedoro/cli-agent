@@ -1,9 +1,11 @@
 """
-System utilities for platform detection.
+System utilities for platform detection and shell integration.
 
-Simple module to detect the operating system for agent context.
+Simple module to detect the operating system for agent context
+and provide shell-related utilities.
 """
 
+import os
 import platform
 
 
@@ -19,10 +21,98 @@ def get_os_name() -> str:
 
 def format_system_context() -> str:
     """
-    Format minimal system information as context string for the agent.
+    Format comprehensive system information as context string for the agent.
+
+    This provides all necessary environment details for the agent to make
+    informed decisions about which commands to execute.
 
     Returns:
-        Simple OS context string for agent.
+        Detailed system context string for agent.
     """
-    os_name = get_os_name()
-    return f"Operating System: {os_name}"
+    os_name = platform.system()
+    os_release = platform.release()
+    machine_arch = platform.machine()
+
+    # Get shell information
+    shell = os.getenv("SHELL", "/bin/sh")
+    shell_name = os.path.basename(shell)
+
+    # Get current working directory and user info
+    cwd = os.getcwd()
+    username = os.getenv("USER", os.getenv("USERNAME", "user"))
+    hostname = platform.node().split(".")[0]
+
+    # Detect package managers
+    package_managers = []
+
+    if os_name == "Darwin":  # macOS
+        package_managers.append("brew")
+        if os.system("which port >/dev/null 2>&1") == 0:
+            package_managers.append("port")
+    elif os_name == "Linux":
+        # Check for common Linux package managers
+        if os.system("which apt >/dev/null 2>&1") == 0:
+            package_managers.append("apt")
+        if os.system("which yum >/dev/null 2>&1") == 0:
+            package_managers.append("yum")
+        if os.system("which dnf >/dev/null 2>&1") == 0:
+            package_managers.append("dnf")
+        if os.system("which pacman >/dev/null 2>&1") == 0:
+            package_managers.append("pacman")
+    elif os_name == "Windows":
+        if os.system("where choco >nul 2>&1") == 0:
+            package_managers.append("choco")
+        if os.system("where winget >nul 2>&1") == 0:
+            package_managers.append("winget")
+
+    # Check for common development tools
+    dev_tools = []
+    for tool in ["git", "python", "python3", "node", "npm", "docker", "uv", "pip"]:
+        if os.system(f"which {tool} >/dev/null 2>&1") == 0:
+            dev_tools.append(tool)
+
+    context_parts = [
+        f"Operating System: {os_name} {os_release} ({machine_arch})",
+        f"Shell: {shell_name} ({shell})",
+        f"Current Directory: {cwd}",
+        f"User: {username}@{hostname}",
+    ]
+
+    if package_managers:
+        context_parts.append(f"Package Managers: {', '.join(package_managers)}")
+
+    if dev_tools:
+        context_parts.append(f"Available Tools: {', '.join(dev_tools)}")
+
+    # Add OS-specific command notes
+    if os_name == "Darwin":
+        context_parts.append("Note: macOS uses BSD-style commands (use stat -f, du without GNU options)")
+    elif os_name == "Linux":
+        context_parts.append("Note: Linux uses GNU-style commands (stat -c, du with GNU options)")
+
+    return "\n".join(context_parts)
+
+
+def get_shell_prompt() -> str:
+    """
+    Generate standard shell prompt.
+
+    Returns:
+        Shell prompt string similar to standard shells.
+    """
+    # Get current working directory
+    cwd = os.getcwd()
+    home = os.path.expanduser("~")
+
+    # Replace home directory with ~ for brevity
+    if cwd.startswith(home):
+        display_path = "~" + cwd[len(home) :]
+    else:
+        display_path = cwd
+
+    # Get hostname and username
+    hostname = platform.node().split(".")[0]  # Get short hostname
+    username = os.getenv("USER", os.getenv("USERNAME", "user"))
+
+    # Format: username@hostname:path$
+    return f"{username}@{hostname}:{display_path}$ "

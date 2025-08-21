@@ -1,6 +1,6 @@
 # LLM Terminal Agent
 
-An experimental Python project for learning and understanding LLM agent principles through practical implementation. This terminal agent supports multiple LLM providers (OpenAI and Google Gemini) with unified Function Calling to execute shell commands safely.
+A modular Python project for learning LLM agent principles through practical implementation. Features unified architecture with multiple interfaces and support for OpenAI, Google Gemini, and LM Studio providers with Function Calling capabilities.
 
 ## Project Purpose
 
@@ -10,42 +10,45 @@ This is a **learning and experimentation project** focused on understanding core
 - Multi-step action planning and execution
 - Tool result processing and analysis
 - Provider abstraction and unified interface design
+- Clean architecture with separated concerns
 - Security considerations for agent systems
 
 **Note**: This is experimental code designed for educational purposes, not intended for production use.
 
-## What This Project Demonstrates
+## Architecture
 
-### Core LLM Agent Principles
+The project follows clean architecture principles with clear separation between business logic and user interfaces:
 
+### Core Components
+
+- **core_agent.py** - Pure agent backend with LLM processing logic
+- **chat_interface.py** - Interactive chat frontend
+- **shell_interface.py** - Shell-like interface with intelligent command routing
+- **main.py** - Unified entry point for all modes
+
+### What This Demonstrates
+
+- **Modular Design**: Clean separation between agent logic and UI frontends
 - **Tool/Function Calling**: Defining and exposing tools to language models
 - **Multi-step Execution**: Agent can execute sequences of commands to complete tasks
-- **Result Analysis**: Model analyzes command outputs and makes informed decisions
-- **Interactive Loop**: Continuous interaction between user requests and agent responses
 - **Provider Abstraction**: Unified interface for different LLM providers
+- **Smart Routing**: Shell mode intelligently routes between direct execution and LLM processing
 - **Security Controls**: Safe execution with permission-based software installation
-
-### Architecture Components
-
-- **Modular Provider System**: Clean separation of provider-specific implementations
-- **Function Mapping Dictionaries**: Elegant dispatch system for provider functions
-- **Unified Tool Interface**: Same tools work across all providers
-- **Security Layer**: Built-in safeguards against unauthorized software installation
-- **Interactive CLI**: Terminal-based conversation with provider selection
 
 ## Features
 
-- **Multiple Provider Support**: Choose between OpenAI, Google Gemini, and LM Studio APIs
-- **Unified API Interface**: Both providers use OpenAI-compatible format for consistency
+- **Two Interface Modes**:
+  - **Chat Mode**: Traditional interactive conversation with User:/Agent: prompts
+  - **Shell Mode**: Standard shell prompt with intelligent command routing
+- **Multiple Provider Support**: OpenAI, Google Gemini, and LM Studio APIs
+- **Unified Backend**: Same agent logic powers both interfaces
+- **Smart Command Detection**: Automatically routes shell commands vs natural language
 - **Security Controls**: Prevents automatic software installation without user permission
-- **Execute terminal commands**: `ls`, `grep`, `find`, `ps`, `cat`, `tail`, `df`, etc.
-- **Multi-step command execution**: Agent can run multiple commands to solve complex tasks
-- **Result analysis**: Natural language responses with actual command output
-- **Interactive terminal mode**: Real-time conversation with provider selection
-- **Model customization**: Specify custom models for each provider
-- **Debug mode**: Verbose output showing iteration steps and token usage
-- **Command execution timeouts**: 30-second safety limits
-- **Comprehensive test coverage**: Full test suite for both providers
+- **Multi-step Execution**: Agent can run multiple commands to solve complex tasks
+- **Result Analysis**: Natural language responses with actual command output
+- **Model Customization**: Specify custom models for each provider
+- **Debug/Trace Modes**: Verbose output showing iteration steps and token usage
+- **Comprehensive Test Coverage**: 45 tests covering all functionality
 
 ## Installation
 
@@ -64,6 +67,13 @@ or with pip:
 ```bash
 pip install -e .[dev]
 ```
+
+3. Install the CLI tool:
+```bash
+uv tool install .
+```
+
+This makes `cli-agent` available globally.
 
 ## Configuration
 
@@ -107,47 +117,135 @@ LM_STUDIO_BASE_URL=http://localhost:1234/v1
 
 ## Usage
 
-### Basic Usage
+### Chat Mode (Default)
+
+Interactive conversation interface with User:/Agent: style prompts:
 
 ```bash
-# Use OpenAI (default)
+# Using installed CLI tool
+cli-agent
+
+# Or run directly
 python main.py
 
-# Use Gemini
-python main.py --provider gemini
-
-# Use LM Studio
-python main.py --provider lmstudio
+# Use different providers
+cli-agent --provider gemini
+cli-agent --provider lmstudio
 
 # Use custom model
-python main.py --provider openai --model gpt-3.5-turbo
+cli-agent --provider openai --model gpt-3.5-turbo
 
 # Enable verbose mode for debugging
-python main.py --verbose --provider gemini
+cli-agent --verbose --provider gemini
+```
 
-# Use custom model with LM Studio
-python main.py --provider lmstudio --model your-model-name
+### Shell Mode
+
+Shell-like interface with intelligent command routing. Executes shell commands directly, falls back to LLM for natural language:
+
+```bash
+# Shell interface with standard prompt
+cli-agent --shell
+
+# Use different providers in shell mode
+cli-agent --shell --provider gemini
+cli-agent --shell --provider lmstudio
+
+# Enable trace mode to see LLM execution details
+cli-agent --shell --trace
+
+# Or set environment variable
+CLI_AGENT_TRACE=1 cli-agent --shell
+```
+
+#### Shell Mode Examples
+
+```bash
+# Direct shell commands - executed immediately
+anfedoro@MBP4Max:~/project$ ls -la
+total 48
+drwxr-xr-x  12 user  staff   384 Aug 21 10:30 .
+drwxr-xr-x   5 user  staff   160 Aug 21 10:29 ..
+-rw-r--r--   1 user  staff  1234 Aug 21 10:30 README.md
+
+# Natural language - processed by LLM
+anfedoro@MBP4Max:~/project$ find all python files and count lines
+🛠️  Executing command: find . -name "*.py" -type f
+🛠️  Executing command: find . -name "*.py" -type f -exec wc -l {} + | tail -1
+Total lines across all Python files: 2,847 lines
 ```
 
 ### Command Line Options
 
 ```bash
-python main.py --help
+cli-agent --help
 ```
 
 Options:
 - `--provider {openai,gemini,lmstudio}` or `-p`: Choose LLM provider (default: openai)
+- `--model MODEL` or `-m`: Specify custom model for the selected provider
+- `--shell` or `-s`: Run in shell mode with intelligent command routing
+- `--verbose` or `-v`: Show detailed token usage information
+- `--trace` or `-t`: Enable trace mode (show LLM execution details)
+- `--no-reasoning`: Disable reasoning for faster responses (LM Studio only)
 - `--model MODEL` or `-m`: Specify model name for the selected provider
-- `--verbose` or `-v`: Show detailed token usage and debug information
+- `--verbose` or `-v`: Show detailed token usage and debug information (chat mode)
+- `--shell` or `-s`: Run in shell mode with standard prompt and intelligent routing
+- `--trace` or `-t`: Enable trace mode (shell mode only)
+- `--no-reasoning`: Disable reasoning process for faster responses (LM Studio)
 - `--help` or `-h`: Show help message
+
+### Shell Mode Features
+
+**Intelligent Command Routing:**
+- Shell commands executed directly: `ls -la`, `grep pattern *.py`, `git status`
+- Natural language processed by LLM: `analyze this code`, `what files are here`
+
+**Standard Shell Experience:**
+- Normal shell prompt format: `user@host:path$`
+- Tab completion for commands and paths
+- Command history navigation
+
+**Silent LLM Mode:**
+- No intermediate "Agent is analyzing..." messages
+- Clean output like a normal shell
+- Enable trace mode to see LLM execution details
 
 ### Example Interactions
 
-- "Show files in current directory"
-- "Find all Python files and count lines of code"
-- "Check system memory usage"
-- "Search for TODO comments in source files"
-- "Analyze disk usage by directory"
+**Chat Mode:**
+```
+You: Show files in current directory
+🛠️  Executing command: ls -la
+🤖 Agent: Here are the files in your current directory:
+total 48
+drwxr-xr-x  12 user  staff   384 Aug 21 10:30 .
+drwxr-xr-x   5 user  staff   160 Aug 21 10:29 ..
+-rw-r--r--   1 user  staff  1234 Aug 21 10:30 README.md
+...
+
+You: Find all Python files and count lines of code
+🛠️  Executing command: find . -name "*.py" -type f -exec wc -l {} +
+🤖 Agent: Found Python files with the following line counts:
+...
+```
+
+**Shell Mode:**
+```bash
+user@host:project$ ls -la                 # Direct shell execution
+total 48
+drwxr-xr-x  12 user  staff   384 Aug 21 10:30 .
+...
+
+user@host:project$ analyze this code      # LLM processing
+🛠️  Executing command: find . -name "*.py" -type f
+🛠️  Executing command: head -20 main.py
+Based on the code analysis, this appears to be...
+
+user@host:project$ git status            # Direct shell execution  
+On branch main
+Your branch is up to date with 'origin/main'.
+```
 
 ### Security Features
 
@@ -166,58 +264,79 @@ Agent: It seems tokei is not installed. To complete this task, I need to install
 
 ### Programmatic Usage
 
+The new modular architecture provides clean APIs for programmatic use:
+
 ```python
-import os
-from agent import LLMProvider, initialize_client, process_user_message
+from core_agent import AgentConfig, LLMProvider
 
-# Using OpenAI
-os.environ["OPENAI_API_KEY"] = "your_key"
-client = initialize_client(LLMProvider.OPENAI)
+# Create agent configuration
+config = AgentConfig(LLMProvider.OPENAI, model="gpt-4")
+config.initialize_client()
+
+# Process messages through core agent
+from core_agent import process_user_message
 response = process_user_message(
     "List all running processes",
-    LLMProvider.OPENAI,
-    client
+    config.provider,
+    config.client,
+    config.chat_history
 )
 print(response)
 
-# Using Gemini
-os.environ["GEMINI_API_KEY"] = "your_key"
-client = initialize_client(LLMProvider.GEMINI)
-response = process_user_message(
-    "List all running processes",
-    LLMProvider.GEMINI,
-    client
-)
-print(response)
+# Use chat interface programmatically
+from chat_interface import handle_chat_message
+response = handle_chat_message("show system info", config)
 
-# Using LM Studio (requires LM Studio running locally)
-client = initialize_client(LLMProvider.LMSTUDIO)
-response = process_user_message(
-    "List all running processes",
-    LLMProvider.LMSTUDIO,
-    client
-)
-print(response)
+# Use shell interface for smart execution
+from shell_interface import smart_execute_with_fallback
+is_shell, output = smart_execute_with_fallback("ls -la", config)
 ```
 
 ## Project Structure
 
 ```
 llm_agent/
-├── providers/                 # Provider modules
-│   ├── __init__.py           # Exports function dictionaries
-│   ├── functions.py          # Function mapping dictionaries
-│   ├── openai.py            # OpenAI-specific implementation
-│   └── gemini.py            # Gemini-specific implementation
-├── agent.py                  # Main agent logic and unified interface
-├── main.py                  # CLI interface with argument parsing
-├── tests/
-│   └── test_agent.py        # Comprehensive test suite
-├── pyproject.toml           # Project dependencies and configuration
-└── README.md                # This file
+├── core_agent.py            # Pure agent backend with LLM logic
+├── chat_interface.py        # Interactive chat frontend
+├── shell_interface.py       # Shell interface with smart routing  
+├── main.py                  # Unified entry point
+├── providers/               # Provider modules
+│   ├── __init__.py         # Exports function dictionaries
+│   ├── functions.py        # Tool definitions and mappings
+│   ├── openai.py          # OpenAI-specific implementation
+│   ├── gemini.py          # Gemini-specific implementation
+│   └── lmstudio.py        # LM Studio-specific implementation
+├── input_handler.py        # Enhanced input with history/completion
+├── utils.py                # System utilities and context
+├── tests/                  # Comprehensive test suite
+│   ├── test_agent.py      # Agent backend tests
+│   ├── test_shell_interface.py  # Shell interface tests
+│   ├── test_input_handler.py    # Input handler tests
+│   └── test_utils.py      # Utilities tests
+├── pyproject.toml          # Project configuration and dependencies
+└── README.md               # This file
 ```
 
 ## Technical Implementation
+
+### Architecture Overview
+
+The project follows clean architecture principles with three main layers:
+
+1. **Core Agent** (`core_agent.py`):
+   - Pure business logic for LLM processing
+   - Multi-iteration execution with function calling
+   - Provider-agnostic message handling
+   - Configuration management via `AgentConfig`
+
+2. **Interface Frontends**:
+   - **Chat Interface** (`chat_interface.py`): Interactive conversation mode
+   - **Shell Interface** (`shell_interface.py`): Shell-like interface with smart routing
+
+3. **Provider Abstraction** (`providers/`):
+   - Unified function mapping dictionaries  
+   - Provider-specific implementations
+   - OpenAI-compatible format for consistency
 
 ### Provider Architecture
 
@@ -228,36 +347,39 @@ The agent uses a modular provider system with function mapping dictionaries:
 INITIALIZE_CLIENT = {
     "openai": openai.initialize_client,
     "gemini": gemini.initialize_client,
+    "lmstudio": lmstudio.initialize_client,
 }
 
 SEND_MESSAGE = {
     "openai": openai.send_message,
     "gemini": gemini.send_message,
+    "lmstudio": lmstudio.send_message,
 }
 # ... other function mappings
 ```
 
-### Unified API Interface
-
-Both providers use OpenAI-compatible format:
-- **OpenAI**: Native OpenAI API
-- **Gemini**: Google's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai/`)
-
-### Tool Definition
-
-Both providers expose the same `run_shell_command` tool with identical schemas, ensuring consistent behavior across providers.
-
 ### Execution Flow
 
-1. User provides natural language request and selects provider
-2. Agent checks if required tools are available
-3. If tools are missing, agent asks permission before installation
-4. Model analyzes request and determines required commands
-5. Model calls `run_shell_command` tool with appropriate parameters
-6. Agent executes command via `subprocess` with safety constraints
-7. Results are returned to model in provider-specific format
-8. Model provides natural language response with actual command output
-9. Process repeats for multi-step tasks
+**Chat Mode:**
+1. User provides input through interactive interface
+2. Core agent processes with full LLM iteration logic
+3. Function calls executed with visual feedback
+4. Response formatted and displayed
+
+**Shell Mode:**
+1. Input received via shell-like prompt
+2. Smart detection: shell command vs natural language
+3. Shell commands executed directly  
+4. Natural language routed to core agent (silent mode)
+5. Clean output without chat-style formatting
+
+**Core Agent Processing:**
+1. Initialize chat history and system context
+2. Send message to selected LLM provider
+3. Extract function calls if present
+4. Execute shell commands via `run_shell_command` tool
+5. Add results back to conversation
+6. Repeat until task complete (max 10 iterations)
 
 ### Safety Measures
 
@@ -270,19 +392,23 @@ Both providers expose the same `run_shell_command` tool with identical schemas, 
 
 ## Testing
 
-Run the test suite:
+Run the comprehensive test suite:
 ```bash
 python -m pytest tests/ -v
 ```
 
-Tests cover:
-- Tool definition and execution for both providers
-- Command success and error scenarios
-- Multi-step execution workflows
-- Provider-specific API integration with mocking
+**Test Coverage (45 tests):**
+- Core agent functionality and multi-iteration logic
+- Chat interface and user interaction handling  
+- Shell interface with smart command routing
+- Provider-specific API integration (mocked)
+- Function calling and tool execution
 - Error handling and edge cases
+- Input handler with readline support
+- System utilities and context formatting
 - Security controls and permission requests
-- Unified interface functionality
+
+Tests ensure backward compatibility and verify that both interfaces use the same reliable agent backend.
 
 ## Adding New Providers
 
@@ -458,43 +584,83 @@ This project helps understand:
 
 ## Future Learning Extensions
 
-This basic implementation can be extended to explore:
+This modular implementation can be extended to explore:
 
-- Additional LLM providers (Anthropic Claude, etc.)
-- Multiple tool types (file operations, web requests, database queries)
-- Persistent conversation memory
-- Advanced planning algorithms
-- Tool composition and chaining
-- Enhanced security models (sandboxing, permission levels)
-- Error recovery strategies
-- Provider-specific optimization strategies
-- Streaming responses
-- Async execution
+- **Additional Interfaces**: Web UI, API server, VS Code extension
+- **Enhanced Providers**: Anthropic Claude, local models (Ollama)
+- **Advanced Tools**: File operations, web requests, database queries
+- **Persistent Memory**: Conversation history, learned preferences
+- **Smart Routing**: More sophisticated command vs NL detection
+- **Security Enhancements**: Sandboxing, granular permissions
+- **Performance**: Streaming responses, async execution
+- **Agent Orchestration**: Multi-agent collaboration
+- **Tool Composition**: Complex multi-step tool chains
+
+## What This Project Teaches
+
+- **Clean Architecture**: Separation of concerns, dependency inversion
+- **Provider Patterns**: Abstraction layers, strategy pattern implementation  
+- **LLM Integration**: Function calling, multi-iteration logic
+- **CLI Design**: Multiple interface modes, user experience
+- **Testing Strategy**: Mocking external APIs, comprehensive coverage
+- **Security Mindset**: Safe execution, permission controls
+- **Modular Design**: Easy extension and maintenance
+
+The codebase serves as a practical example of how to build robust, extensible LLM agent systems with proper architecture and testing.
 
 ## Examples
 
-### Basic File Operations
+### Chat Mode Examples
+
+**Basic File Operations:**
 ```
-User: Show me all Python files in this directory
-Agent: [Executes: find . -name "*.py"]
+You: Show me all Python files in this directory
+🛠️  Executing command: find . -name "*.py" -type f
+🤖 Agent: Found the following Python files in your directory:
+./core_agent.py
+./chat_interface.py
+./shell_interface.py
+./main.py
+...
 ```
 
-### System Analysis
+**System Analysis:**
 ```
-User: Check system performance
-Agent: [Executes: top, df -h, free -m]
+You: Check system performance
+🛠️  Executing command: top -n 1 -b | head -10
+🛠️  Executing command: df -h
+🛠️  Executing command: free -m
+🤖 Agent: Here's your current system performance:
+
+CPU Usage: [top output]
+Disk Usage: [df output]  
+Memory Usage: [free output]
 ```
 
-### Code Analysis
-```
-User: Count lines of code in this project
-Agent: I need to use a code analysis tool. May I install 'cloc' to complete this task?
+### Shell Mode Examples
+
+**Direct Commands:**
+```bash
+user@host:project$ ls -la
+total 48
+drwxr-xr-x  12 user  staff   384 Aug 21 10:30 .
+...
+
+user@host:project$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
 ```
 
-### Multi-step Tasks
-```
-User: Find large files and show disk usage
-Agent: [Executes: find . -size +10M, du -sh *, df -h]
+**Natural Language Processing:**
+```bash
+user@host:project$ analyze the code structure
+🛠️  Executing command: find . -name "*.py" -type f | head -10
+🛠️  Executing command: wc -l *.py
+This project has a modular architecture with:
+- Core agent backend (core_agent.py)
+- Two frontend interfaces (chat_interface.py, shell_interface.py)
+- Provider abstraction layer (providers/)
+...
 ```
 
 The agent handles complex, multi-step requests by breaking them down into appropriate command sequences while maintaining security and providing clear, actionable results.

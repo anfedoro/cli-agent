@@ -1,6 +1,7 @@
 import argparse
 
-from agent import main
+from chat_interface import chat_main
+from shell_interface import shell_main
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LLM Terminal Agent")
@@ -8,6 +9,25 @@ if __name__ == "__main__":
     parser.add_argument("--provider", "-p", choices=["openai", "gemini", "lmstudio"], default="openai", help="LLM provider to use (default: openai)")
     parser.add_argument("--model", "-m", help="Model to use for the selected provider")
     parser.add_argument("--no-reasoning", action="store_true", help="Disable reasoning process for faster responses (LM Studio)")
+    parser.add_argument("--mode", choices=["chat", "shell"], default="chat", help="Run mode: chat (conversation) or shell (command mode)")
+    parser.add_argument("--trace", "-t", action="store_true", help="Enable trace mode (show LLM execution details, only in shell mode)")
     args = parser.parse_args()
 
-    main(verbose=args.verbose, provider=args.provider, model=args.model, no_reasoning=args.no_reasoning)
+    if args.mode == "shell":
+        # Shell mode: standard shell prompt with intelligent routing
+        shell_main(provider=args.provider, model=args.model, trace=args.trace or args.verbose)
+    else:
+        # Chat mode: User/Agent conversation style using chat interface
+        from core_agent import LLMProvider
+
+        # Convert string to enum
+        if args.provider == "openai":
+            provider = LLMProvider.OPENAI
+        elif args.provider == "gemini":
+            provider = LLMProvider.GEMINI
+        elif args.provider == "lmstudio":
+            provider = LLMProvider.LMSTUDIO
+        else:
+            provider = LLMProvider.OPENAI  # fallback
+
+        chat_main(provider=provider, model=args.model, verbose=args.verbose)
