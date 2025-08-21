@@ -20,7 +20,7 @@ from providers import (
     INITIALIZE_CLIENT,
     SEND_MESSAGE,
 )
-from utils import format_system_context
+from agent.utils import format_system_context
 
 # Load environment variables from .env file
 load_dotenv()

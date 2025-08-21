@@ -1,7 +1,7 @@
 import argparse
 
-from chat_interface import chat_main
-from shell_interface import shell_main
+from interface.chat_interface import chat_main
+from interface.shell_interface import shell_main
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LLM Terminal Agent")
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         shell_main(provider=args.provider, model=args.model, trace=args.trace or args.verbose)
     else:
         # Chat mode: User/Agent conversation style using chat interface
-        from core_agent import LLMProvider
+        from agent.core_agent import LLMProvider
 
         # Convert string to enum
         if args.provider == "openai":

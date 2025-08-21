@@ -7,8 +7,8 @@ Chat Frontend - интерактивный чат интерфейс.
 
 from typing import Optional
 
-from core_agent import AgentConfig, LLMProvider, process_user_message
-from input_handler import cleanup_input_handler, enhanced_input, is_readline_available
+from agent.core_agent import AgentConfig, LLMProvider, process_user_message
+from input_handler.input_handler import cleanup_input_handler, enhanced_input, is_readline_available
 
 
 def create_chat_session(provider: LLMProvider, model: Optional[str] = None) -> AgentConfig:

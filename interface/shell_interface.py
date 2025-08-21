@@ -12,9 +12,9 @@ import subprocess
 import sys
 from typing import Optional, Tuple
 
-from core_agent import AgentConfig, LLMProvider, process_user_message
-from input_handler import enhanced_input, is_readline_available
-from utils import get_shell_prompt
+from agent.core_agent import AgentConfig, LLMProvider, process_user_message
+from input_handler.input_handler import enhanced_input, is_readline_available
+from agent.utils import get_shell_prompt
 
 
 # Common shell commands that should be executed directly
@@ -153,6 +153,7 @@ def looks_like_command_failure(input_text: str, error_message: str) -> bool:
     # Check error message patterns that indicate genuine command attempts
     command_error_patterns = [
         "command not found",
+        "not found",
         "No such file or directory",
         "Permission denied",
         "not a directory",
@@ -176,15 +177,21 @@ def looks_like_command_failure(input_text: str, error_message: str) -> bool:
 
 
 def is_shell_command(input_text: str) -> bool:
-    """Legacy function - now we use smart_execute_with_fallback instead.
+    """Check if input text looks like a shell command.
 
-    Kept for backward compatibility with tests.
+    Returns True for commands that are clearly shell commands.
     """
-    # Simplified logic since we now rely on smart execution
     if not input_text.strip():
         return False
 
-    # Only obvious cases that we know should be shell commands
+    # Get the first word (command)
+    first_word = input_text.strip().split()[0]
+
+    # Check if it's in our known shell commands set
+    if first_word in SHELL_COMMANDS:
+        return True
+
+    # Check for shell operators
     shell_operators = ["|", ">", ">>", "<", "&&", "||", ";", "&"]
     if any(op in input_text for op in shell_operators):
         return True
@@ -193,7 +200,7 @@ def is_shell_command(input_text: str) -> bool:
     if input_text.startswith("./") or input_text.startswith("/") or input_text.startswith("~/"):
         return True
 
-    # For everything else, let smart_execute_with_fallback decide
+    # For everything else, assume it's natural language
     return False
 
 
