@@ -13,14 +13,14 @@ from pathlib import Path
 def get_config_dir() -> Path:
     """Get the configuration directory path based on OS.
 
-    - Unix/macOS: ~/.cliagent  
+    - Unix/macOS: ~/.cliagent
     - Windows: ~/.cliagent (unified approach for simplicity)
 
     Returns:
         Path to configuration directory
     """
     home = Path.home()
-    
+
     # Use unified approach: ~/.cliagent on all platforms
     # This simplifies cross-platform development and user experience
     return home / ".cliagent"

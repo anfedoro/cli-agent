@@ -89,6 +89,7 @@ source = { editable = "." }
 dependencies = [
     { name = "google-generativeai" },
     { name = "openai" },
+    { name = "pyreadline3", marker = "sys_platform == 'win32'" },
     { name = "python-dotenv" },
 ]
 
@@ -97,20 +98,17 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
-readline = [
-    { name = "pyreadline3", marker = "sys_platform == 'win32'" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "google-generativeai", specifier = ">=0.3.0" },
     { name = "openai", specifier = ">=1.0.0" },
-    { name = "pyreadline3", marker = "sys_platform == 'win32' and extra == 'readline'" },
+    { name = "pyreadline3", marker = "sys_platform == 'win32'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
-provides-extras = ["dev", "readline"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "colorama"

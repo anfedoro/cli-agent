@@ -57,14 +57,14 @@ def smart_execute_with_fallback(input_text: str, config: AgentConfig) -> Tuple[b
 
     # Check if this looks like a "command not found" error (cross-platform)
     command_not_found_indicators = [
-        "command not found",           # Unix/Linux
-        "not found",                   # Generic
-        "is not recognized",           # Windows PowerShell/CMD
-        "not recognized as",           # Windows PowerShell
+        "command not found",  # Unix/Linux
+        "not found",  # Generic
+        "is not recognized",  # Windows PowerShell/CMD
+        "not recognized as",  # Windows PowerShell
     ]
-    
+
     is_command_not_found = any(indicator in stderr.lower() for indicator in command_not_found_indicators)
-    
+
     if is_command_not_found:
         # This might be natural language or a typo - send to LLM for help
         if trace_enabled:
@@ -294,7 +294,7 @@ def shell_main(provider: str = "openai", model: Optional[str] = None, trace: boo
     finally:
         # Cleanup input handler to save history
         cleanup_input_handler()
-        
+
         # Restore initial directory if preserve_initial_location is True
         if preserve_location:
             try:
