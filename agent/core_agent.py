@@ -20,7 +20,7 @@ from providers import (
     INITIALIZE_CLIENT,
     SEND_MESSAGE,
 )
-from agent.utils import format_system_context
+from agent.utils import format_system_context, get_subprocess_kwargs
 
 # Load environment variables from .env file
 load_dotenv()
@@ -83,13 +83,13 @@ HISTORY_TRIM_LINES = 2
 MAX_COMMAND_OUTPUT_SIZE = 2000  # Maximum characters for command output
 
 # System prompt used for all providers and modes (chat and shell)
-SYSTEM_PROMPT = """You are a terminal agent with access to Linux/Unix command-line tools (ls, grep, find, cat, ps, df, etc.).
+SYSTEM_PROMPT = """You are a terminal agent with cross-platform command-line access (Windows PowerShell/CMD, Linux/Unix shells).
 
 SECURITY RULES:
 	•	NEVER install software without explicit user permission.
 	•	NEVER execute commands like apt, yum, brew, pip, npm, cargo install unless explicitly allowed.
-	•	Check tool availability using [which [tool]] or [[tool] --version.]
-    •	ALWAYS use "which" command separately of other commands to let agent hide it from the output
+	•	Check tool availability by trying to run the tool with --version or --help first.
+    •	On Windows, use PowerShell commands where possible; on Unix/Linux, use standard shell commands.
 	•	If a required tool is missing, clearly state which tool is needed and ask: "To proceed, I need to install [tool]. May I do so?"
 
 EXECUTION STRATEGY:
@@ -193,13 +193,10 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
 
         try:
             # Execute command through shell
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+            subprocess_kwargs = get_subprocess_kwargs()
+            subprocess_kwargs.update({"timeout": timeout})
+            
+            result = subprocess.run(command, **subprocess_kwargs)
 
             if verbose:
                 stdout_lines = result.stdout.count("\n") if result.stdout else 0

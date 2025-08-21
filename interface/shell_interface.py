@@ -9,13 +9,22 @@ This module provides a shell-like interface where:
 """
 
 import os
+import platform
 import subprocess
 import sys
 from typing import Optional, Tuple
 
 from agent.core_agent import AgentConfig, LLMProvider, process_user_message
 from input_handler.input_handler import enhanced_input, is_readline_available
-from agent.utils import get_shell_prompt
+from agent.utils import get_shell_prompt, get_subprocess_kwargs
+
+
+def clear_screen():
+    """Clear screen in a cross-platform way."""
+    if platform.system() == "Windows":
+        os.system("cls")
+    else:
+        os.system("clear")
 
 
 def smart_execute_with_fallback(input_text: str, config: AgentConfig) -> Tuple[bool, str]:
@@ -153,13 +162,12 @@ def execute_shell_command(command: str) -> Tuple[int, str, str]:
             return 0, os.getcwd() + "\n", ""
 
         # For all other commands, use subprocess as before
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,  # 5 minute timeout
-        )
+        subprocess_kwargs = get_subprocess_kwargs()
+        subprocess_kwargs.update({
+            "timeout": 300,  # 5 minute timeout
+        })
+        
+        result = subprocess.run(command, **subprocess_kwargs)
         return result.returncode, result.stdout, result.stderr
 
     except subprocess.TimeoutExpired:
@@ -269,7 +277,7 @@ def shell_main(provider: str = "openai", model: Optional[str] = None, trace: boo
 
                 # Handle special shell commands
                 if user_input == "clear":
-                    os.system("clear")
+                    clear_screen()
                     continue
 
                 # Use smart execution with LLM fallback

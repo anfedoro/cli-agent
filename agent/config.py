@@ -15,7 +15,7 @@ from typing import Dict, Any
 
 def get_config_dir() -> Path:
     """Get the CLI Agent configuration directory path.
-    
+
     Cross-platform configuration directory:
     - Unix/macOS: ~/.cliagent
     - Windows: %APPDATA%/cli-agent
@@ -24,7 +24,7 @@ def get_config_dir() -> Path:
         Path to configuration directory
     """
     home = Path.home()
-    
+
     if platform.system() == "Windows":
         # Use APPDATA on Windows for user settings
         appdata = os.getenv("APPDATA")

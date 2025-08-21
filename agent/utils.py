@@ -9,7 +9,9 @@ import os
 import platform
 import getpass
 import socket
+import shutil
 from pathlib import Path
+from typing import Dict, Any
 
 
 def get_os_name() -> str:
@@ -20,6 +22,33 @@ def get_os_name() -> str:
         Operating system name (Darwin, Linux, Windows, etc.)
     """
     return platform.system()
+
+
+def get_subprocess_kwargs() -> Dict[str, Any]:
+    """
+    Get appropriate subprocess kwargs for the current platform.
+    
+    Returns:
+        dict: kwargs for subprocess.run() including shell settings
+    """
+    kwargs: Dict[str, Any] = {
+        "shell": True,
+        "capture_output": True,
+        "text": True
+    }
+    
+    # On Windows, try to use PowerShell if available
+    if platform.system() == "Windows":
+        pwsh_path = shutil.which("pwsh")
+        if pwsh_path:
+            kwargs["executable"] = pwsh_path
+        else:
+            powershell_path = shutil.which("powershell")
+            if powershell_path:
+                kwargs["executable"] = powershell_path
+        # If neither PowerShell is available, use default CMD (no executable specified)
+    
+    return kwargs
 
 
 def format_system_context() -> str:
@@ -37,7 +66,16 @@ def format_system_context() -> str:
     machine_arch = platform.machine()
 
     # Get shell information
-    shell = os.getenv("SHELL", "/bin/sh")
+    if os_name == "Windows":
+        # For Windows: try PowerShell, then fallback to CMD
+        if shutil.which("pwsh"):
+            shell = "pwsh"
+        elif shutil.which("powershell"):
+            shell = "powershell"
+        else:
+            shell = "cmd.exe"
+    else:
+        shell = os.getenv("SHELL", "/bin/sh")
     shell_name = os.path.basename(shell)
 
     # Get current working directory and user info
@@ -50,28 +88,28 @@ def format_system_context() -> str:
 
     if os_name == "Darwin":  # macOS
         package_managers.append("brew")
-        if os.system("which port >/dev/null 2>&1") == 0:
+        if shutil.which("port"):
             package_managers.append("port")
     elif os_name == "Linux":
         # Check for common Linux package managers
-        if os.system("which apt >/dev/null 2>&1") == 0:
+        if shutil.which("apt"):
             package_managers.append("apt")
-        if os.system("which yum >/dev/null 2>&1") == 0:
+        if shutil.which("yum"):
             package_managers.append("yum")
-        if os.system("which dnf >/dev/null 2>&1") == 0:
+        if shutil.which("dnf"):
             package_managers.append("dnf")
-        if os.system("which pacman >/dev/null 2>&1") == 0:
+        if shutil.which("pacman"):
             package_managers.append("pacman")
     elif os_name == "Windows":
-        if os.system("where choco >nul 2>&1") == 0:
+        if shutil.which("choco"):
             package_managers.append("choco")
-        if os.system("where winget >nul 2>&1") == 0:
+        if shutil.which("winget"):
             package_managers.append("winget")
 
     # Check for common development tools
     dev_tools = []
     for tool in ["git", "python", "python3", "node", "npm", "docker", "uv", "pip"]:
-        if os.system(f"which {tool} >/dev/null 2>&1") == 0:
+        if shutil.which(tool):
             dev_tools.append(tool)
 
     context_parts = [
@@ -92,6 +130,8 @@ def format_system_context() -> str:
         context_parts.append("Note: macOS uses BSD-style commands (use stat -f, du without GNU options)")
     elif os_name == "Linux":
         context_parts.append("Note: Linux uses GNU-style commands (stat -c, du with GNU options)")
+    elif os_name == "Windows":
+        context_parts.append(f"Note: Windows shell ({shell_name}) - use PowerShell cmdlets or Windows commands")
 
     return "\n".join(context_parts)
 
