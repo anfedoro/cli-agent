@@ -55,8 +55,17 @@ def smart_execute_with_fallback(input_text: str, config: AgentConfig) -> Tuple[b
         print(f"[TRACE] Shell execution failed (exit code: {exit_code})")
         print(f"[TRACE] Error: {stderr}")
 
-    # Check if this looks like a "command not found" error
-    if "command not found" in stderr.lower() or "not found" in stderr.lower():
+    # Check if this looks like a "command not found" error (cross-platform)
+    command_not_found_indicators = [
+        "command not found",           # Unix/Linux
+        "not found",                   # Generic
+        "is not recognized",           # Windows PowerShell/CMD
+        "not recognized as",           # Windows PowerShell
+    ]
+    
+    is_command_not_found = any(indicator in stderr.lower() for indicator in command_not_found_indicators)
+    
+    if is_command_not_found:
         # This might be natural language or a typo - send to LLM for help
         if trace_enabled:
             print("[TRACE] Command not found - sending to LLM for help")
@@ -68,26 +77,6 @@ def smart_execute_with_fallback(input_text: str, config: AgentConfig) -> Tuple[b
             print("[TRACE] Command error - showing shell error")
         error_output = stderr if stderr else f"Command failed with exit code {exit_code}"
         return True, error_output
-
-    # If command failed, analyze the failure
-    if trace_enabled:
-        print(f"[TRACE] Shell execution failed (exit code: {exit_code})")
-        print(f"[TRACE] Error: {stderr}")
-
-    # Check if this looks like a genuine command failure vs natural language
-    if looks_like_command_failure(input_text, stderr):
-        # For "command not found" errors, send to LLM for intelligent help
-        if "command not found" in stderr.lower():
-            if trace_enabled:
-                print("[TRACE] Command not found - sending to LLM for help")
-            llm_response = process_llm_request(input_text, config)
-            return False, llm_response
-        else:
-            # Other command errors (permission denied, etc.) - show as shell error
-            if trace_enabled:
-                print("[TRACE] Command error - showing shell error")
-            error_output = stderr if stderr else f"Command failed with exit code {exit_code}"
-            return True, error_output
 
     # This is probably natural language - send to LLM
     if trace_enabled:
