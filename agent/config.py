@@ -3,39 +3,27 @@ CLI Agent Configuration Management
 
 Handles creation and management of configuration directory for storing
 agent settings, chat history, and other persistent data.
-Cross-platform support for Unix (~/.cliagent) and Windows (%APPDATA%/cli-agent).
+Cross-platform unified approach using ~/.cliagent on all platforms.
 """
 
 import json
-import os
-import platform
 from pathlib import Path
-from typing import Dict, Any
 
 
 def get_config_dir() -> Path:
-    """Get the CLI Agent configuration directory path.
+    """Get the configuration directory path based on OS.
 
-    Cross-platform configuration directory:
-    - Unix/macOS: ~/.cliagent
-    - Windows: %APPDATA%/cli-agent
+    - Unix/macOS: ~/.cliagent  
+    - Windows: ~/.cliagent (unified approach for simplicity)
 
     Returns:
         Path to configuration directory
     """
     home = Path.home()
-
-    if platform.system() == "Windows":
-        # Use APPDATA on Windows for user settings
-        appdata = os.getenv("APPDATA")
-        if appdata:
-            return Path(appdata) / "cli-agent"
-        else:
-            # Fallback to home directory if APPDATA not found
-            return home / "cli-agent"
-    else:
-        # Unix/macOS: use dot directory in home
-        return home / ".cliagent"
+    
+    # Use unified approach: ~/.cliagent on all platforms
+    # This simplifies cross-platform development and user experience
+    return home / ".cliagent"
 
 
 def ensure_config_dir() -> Path:
@@ -56,7 +44,7 @@ def get_history_file() -> Path:
 
     Returns:
         Path to history.txt in configuration directory
-        (Unix: ~/.cliagent/history.txt, Windows: %APPDATA%/cli-agent/history.txt)
+        (All platforms: ~/.cliagent/history.txt)
     """
     return ensure_config_dir() / "history.txt"
 
@@ -66,7 +54,7 @@ def get_settings_file() -> Path:
 
     Returns:
         Path to settings.json in configuration directory
-        (Unix: ~/.cliagent/settings.json, Windows: %APPDATA%/cli-agent/settings.json)
+        (All platforms: ~/.cliagent/settings.json)
     """
     return ensure_config_dir() / "settings.json"
 
