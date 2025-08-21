@@ -195,7 +195,7 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
             # Execute command through shell
             subprocess_kwargs = get_subprocess_kwargs()
             subprocess_kwargs.update({"timeout": timeout})
-            
+
             result = subprocess.run(command, **subprocess_kwargs)
 
             if verbose:

@@ -163,10 +163,12 @@ def execute_shell_command(command: str) -> Tuple[int, str, str]:
 
         # For all other commands, use subprocess as before
         subprocess_kwargs = get_subprocess_kwargs()
-        subprocess_kwargs.update({
-            "timeout": 300,  # 5 minute timeout
-        })
-        
+        subprocess_kwargs.update(
+            {
+                "timeout": 300,  # 5 minute timeout
+            }
+        )
+
         result = subprocess.run(command, **subprocess_kwargs)
         return result.returncode, result.stdout, result.stderr
 

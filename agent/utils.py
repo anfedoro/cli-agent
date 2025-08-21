@@ -27,16 +27,12 @@ def get_os_name() -> str:
 def get_subprocess_kwargs() -> Dict[str, Any]:
     """
     Get appropriate subprocess kwargs for the current platform.
-    
+
     Returns:
         dict: kwargs for subprocess.run() including shell settings
     """
-    kwargs: Dict[str, Any] = {
-        "shell": True,
-        "capture_output": True,
-        "text": True
-    }
-    
+    kwargs: Dict[str, Any] = {"shell": True, "capture_output": True, "text": True}
+
     # On Windows, try to use PowerShell if available
     if platform.system() == "Windows":
         pwsh_path = shutil.which("pwsh")
@@ -47,7 +43,7 @@ def get_subprocess_kwargs() -> Dict[str, Any]:
             if powershell_path:
                 kwargs["executable"] = powershell_path
         # If neither PowerShell is available, use default CMD (no executable specified)
-    
+
     return kwargs
 
 
