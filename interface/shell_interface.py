@@ -15,7 +15,7 @@ import sys
 from typing import Optional, Tuple
 
 from agent.core_agent import AgentConfig, LLMProvider, process_user_message
-from input_handler.input_handler import enhanced_input, is_readline_available
+from input_handler.input_handler import enhanced_input, is_readline_available, cleanup_input_handler
 from agent.utils import get_shell_prompt, get_subprocess_kwargs
 
 
@@ -292,6 +292,9 @@ def shell_main(provider: str = "openai", model: Optional[str] = None, trace: boo
                 print(f"Error: {e}", file=sys.stderr)
 
     finally:
+        # Cleanup input handler to save history
+        cleanup_input_handler()
+        
         # Restore initial directory if preserve_initial_location is True
         if preserve_location:
             try:

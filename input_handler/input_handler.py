@@ -1,19 +1,43 @@
 """
 Enhanced input handler with readline support for session history, editing, and path completion.
 
-Provides intelligent path completion for any context - works for commands and file paths universally.
-Handles both GNU readline and macOS libedit backends.
+This module attempts to use the readline library for better input handling,
+including command history, line editing, and path auto-completion.
+Falls back gracefully to basic input() if readline is not available.
 """
 
 import os
 import glob
+import atexit
 from typing import Optional
 
 # Global flag to track readline availability
 _readline_available = False
 
 try:
+    # Try importing readline
     import readline
+    from agent.config import get_history_file
+    
+    def setup_readline():
+        """Setup readline with history support."""
+        history_file = get_history_file()
+        
+        # Load existing history
+        try:
+            if history_file.exists():
+                readline.read_history_file(str(history_file))
+        except (FileNotFoundError, PermissionError, OSError):
+            pass  # History file doesn't exist, can't be read, or other OS error
+        
+        # Save history on exit
+        def save_history():
+            try:
+                readline.write_history_file(str(history_file))
+            except (FileNotFoundError, PermissionError, OSError):
+                pass  # Can't save history file
+        
+        atexit.register(save_history)
 
     def path_completer(text: str, state: int) -> Optional[str]:
         """Universal path completion function that works in any context."""
@@ -66,11 +90,14 @@ try:
 
     # Set word delimiters (works for both)
     readline.set_completer_delims(" \t\n")
+    
+    # Setup history support
+    setup_readline()
 
     _readline_available = True
 
 except ImportError:
-    # readline not available (Windows)
+    # readline not available (Windows without pyreadline3)
     _readline_available = False
 
 
@@ -81,7 +108,13 @@ def enhanced_input(prompt: str = "") -> str:
 
 def cleanup_input_handler():
     """Cleanup function for compatibility."""
-    pass
+    if _readline_available:
+        try:
+            from agent.config import get_history_file
+            history_file = get_history_file()
+            readline.write_history_file(str(history_file))
+        except (NameError, ImportError, FileNotFoundError, PermissionError, OSError):
+            pass  # Can't save history
 
 
 def is_readline_available() -> bool:
