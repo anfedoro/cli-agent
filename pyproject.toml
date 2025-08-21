@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cli-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "LLM Terminal Agent supporting multiple providers"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -24,7 +24,7 @@ dev = [
 cli-agent = "main:main"
 
 [tool.setuptools]
-py-modules = ["main", "agent", "input_handler", "utils", "shell_interface"]
+py-modules = ["main", "agent", "input_handler", "utils", "shell_interface", "chat_interface"]
 
 [tool.setuptools.packages.find]
 include = ["providers"]
