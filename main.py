@@ -2,10 +2,14 @@ import argparse
 
 from interface.chat_interface import chat_main
 from interface.shell_interface import shell_main
+from agent.config import initialize_config
 
 
 def main():
     """Main entry point for the CLI agent."""
+    # Initialize configuration directory on first run
+    initialize_config()
+    
     parser = argparse.ArgumentParser(description="LLM Terminal Agent")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed token usage information")
     parser.add_argument("--provider", "-p", choices=["openai", "gemini", "lmstudio"], default="openai", help="LLM provider to use (default: openai)")
