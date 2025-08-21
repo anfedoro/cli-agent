@@ -3,7 +3,9 @@ import argparse
 from interface.chat_interface import chat_main
 from interface.shell_interface import shell_main
 
-if __name__ == "__main__":
+
+def main():
+    """Main entry point for the CLI agent."""
     parser = argparse.ArgumentParser(description="LLM Terminal Agent")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed token usage information")
     parser.add_argument("--provider", "-p", choices=["openai", "gemini", "lmstudio"], default="openai", help="LLM provider to use (default: openai)")
@@ -31,3 +33,7 @@ if __name__ == "__main__":
             provider = LLMProvider.OPENAI  # fallback
 
         chat_main(provider=provider, model=args.model, verbose=args.verbose)
+
+
+if __name__ == "__main__":
+    main()
