@@ -13,32 +13,9 @@ load_dotenv()
 
 def get_available_tools() -> List[Dict[str, Any]]:
     """Return available tool definitions for Gemini API using OpenAI format."""
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": "run_shell_command",
-                "description": "Execute shell command in terminal and return execution result",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "Shell command to execute, e.g. 'ls -la /tmp' or 'grep -r \"pattern\" .'",
-                        },
-                        "estimated_timeout": {
-                            "type": "integer",
-                            "description": "Estimated timeout in seconds (5-300). Consider command complexity: find/du operations need 60-300s, simple commands like ls/ps need 5-30s",
-                            "minimum": 5,
-                            "maximum": 300,
-                            "default": 30,
-                        },
-                    },
-                    "required": ["command"],
-                },
-            },
-        }
-    ]
+    from agent.core_agent import get_agent_tools
+
+    return get_agent_tools()
 
 
 def initialize_client() -> OpenAI:

@@ -7,6 +7,9 @@ and provide shell-related utilities.
 
 import os
 import platform
+import getpass
+import socket
+from pathlib import Path
 
 
 def get_os_name() -> str:
@@ -93,26 +96,36 @@ def format_system_context() -> str:
     return "\n".join(context_parts)
 
 
-def get_shell_prompt() -> str:
+def get_shell_prompt(agent_mode=False):
     """
-    Generate standard shell prompt.
+    Генерирует приглашение командной строки для shell режима.
+
+    Args:
+        agent_mode (bool): True для отображения индикатора агента в приглашении
 
     Returns:
-        Shell prompt string similar to standard shells.
+        str: Строка приглашения командной строки
     """
-    # Get current working directory
-    cwd = os.getcwd()
-    home = os.path.expanduser("~")
+    from agent.config import get_setting
 
-    # Replace home directory with ~ for brevity
-    if cwd.startswith(home):
-        display_path = "~" + cwd[len(home) :]
+    user = getpass.getuser()
+    hostname = socket.gethostname().split(".")[0]
+    current_dir = Path.cwd()
+
+    # Сокращаем путь если он в домашней директории
+    home = Path.home()
+    if current_dir == home:
+        path = "~"
+    elif current_dir.is_relative_to(home):
+        path = "~/" + str(current_dir.relative_to(home))
     else:
-        display_path = cwd
+        path = str(current_dir)
 
-    # Get hostname and username
-    hostname = platform.node().split(".")[0]  # Get short hostname
-    username = os.getenv("USER", os.getenv("USERNAME", "user"))
+    # Добавляем индикатор агента если включен режим агента
+    indicator = ""
+    if agent_mode:
+        agent_indicator = get_setting("agent_prompt_indicator", "⭐")
+        if agent_indicator:
+            indicator = agent_indicator + " "
 
-    # Format: username@hostname:path$
-    return f"{username}@{hostname}:{display_path}$ "
+    return f"{indicator}{user}@{hostname}:{path}$ "

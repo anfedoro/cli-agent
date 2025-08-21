@@ -12,8 +12,27 @@ This is a **learning and experimentation project** focused on understanding core
 - Provider abstraction and unified interface design
 - Clean architecture with separated concerns
 - Security considerations for agent systems
+- Configuration management through natural language
 
 **Note**: This is experimental code designed for educational purposes, not intended for production use.
+
+## Key Features
+
+### 🎯 Smart Configuration Management
+- **Natural Language Configuration**: Tell the agent "change default mode to shell" or "set the prompt indicator to a robot emoji"
+- **Persistent Settings**: Configuration automatically saved to `~/.cliagent/settings.json`
+- **Dynamic Defaults**: Command-line arguments use your saved preferences as defaults
+
+### 🐚 Enhanced Shell Experience  
+- **Visual Agent Indicator**: Shell prompt shows ⭐ (configurable) when in agent mode
+- **Universal Tab Completion**: Path completion works everywhere, not just specific commands
+- **Smart Directory Handling**: Built-in `cd` and `pwd` commands that actually change directories
+- **Preserve Location**: Optionally return to starting directory when exiting (configurable)
+
+### 🏗️ Clean Architecture
+- **Centralized Tools**: All LLM tools defined once in core agent, not duplicated across providers
+- **Provider Focus**: Providers only handle API communication, agent controls all tool definitions
+- **Unified Interface**: Same backend powers both chat and shell modes
 
 ## Architecture
 
@@ -21,17 +40,21 @@ The project follows clean architecture principles with clear separation between 
 
 ### Core Components
 
-- **core_agent.py** - Pure agent backend with LLM processing logic
-- **chat_interface.py** - Interactive chat frontend
-- **shell_interface.py** - Shell-like interface with intelligent command routing
+- **agent/core_agent.py** - Pure agent backend with LLM processing logic and centralized tool definitions
+- **interface/chat_interface.py** - Interactive chat frontend  
+- **interface/shell_interface.py** - Shell-like interface with intelligent command routing
+- **agent/config.py** - Configuration management with natural language updates
+- **input_handler/** - Enhanced input handling with universal tab completion
 - **main.py** - Unified entry point for all modes
 
 ### What This Demonstrates
 
 - **Modular Design**: Clean separation between agent logic and UI frontends
-- **Tool/Function Calling**: Defining and exposing tools to language models
+- **Tool/Function Calling**: Centralized tool definitions exposed to all LLM providers
 - **Multi-step Execution**: Agent can execute sequences of commands to complete tasks
-- **Provider Abstraction**: Unified interface for different LLM providers
+- **Provider Abstraction**: Unified interface for different LLM providers, providers only handle API calls
+- **Smart Configuration**: Natural language configuration changes through LLM function calls
+- **Enhanced Shell UX**: Visual indicators, universal tab completion, proper directory handling
 - **Smart Routing**: Shell mode intelligently routes between direct execution and LLM processing
 - **Security Controls**: Safe execution with permission-based software installation
 
@@ -39,15 +62,23 @@ The project follows clean architecture principles with clear separation between 
 
 - **Two Interface Modes**:
   - **Chat Mode**: Traditional interactive conversation with User:/Agent: prompts
-  - **Shell Mode**: Standard shell prompt with intelligent command routing
+  - **Shell Mode**: Standard shell prompt with intelligent command routing and visual agent indicator
 - **Multiple Provider Support**: OpenAI, Google Gemini, and LM Studio APIs
 - **Unified Backend**: Same agent logic powers both interfaces
 - **Smart Command Detection**: Automatically routes shell commands vs natural language
+- **Natural Language Configuration**: Change settings by talking to the agent
+- **Enhanced Shell Experience**: 
+  - Visual prompt indicator (⭐) when in agent mode
+  - Universal tab completion for paths and commands
+  - Proper `cd`/`pwd` built-in commands
+  - Optional directory restoration on exit
+- **Centralized Tool Architecture**: All tools defined once in core agent, not duplicated per provider
 - **Security Controls**: Prevents automatic software installation without user permission
 - **Multi-step Execution**: Agent can run multiple commands to solve complex tasks
 - **Result Analysis**: Natural language responses with actual command output
 - **Model Customization**: Specify custom models for each provider
 - **Debug/Trace Modes**: Verbose output showing iteration steps and token usage
+- **Persistent Configuration**: Settings saved to `~/.cliagent/settings.json`
 - **Comprehensive Test Coverage**: 45 tests covering all functionality
 
 ## Installation
@@ -76,6 +107,13 @@ uv tool install .
 This makes `cli-agent` available globally.
 
 ## Configuration
+
+The agent creates a configuration directory at `~/.cliagent/` with persistent settings:
+
+- **settings.json** - User preferences and defaults
+- **history.txt** - Command history for shell mode
+
+### Initial Setup
 
 ### For OpenAI
 
@@ -115,25 +153,66 @@ GEMINI_API_KEY=your_gemini_api_key_here
 LM_STUDIO_BASE_URL=http://localhost:1234/v1
 ```
 
+### Smart Configuration Management
+
+The agent includes a powerful configuration system that can be updated through natural language:
+
+**Example Configuration Commands:**
+```bash
+# In chat or shell mode, just tell the agent what you want:
+"Change the default mode to shell"
+"Set the prompt indicator to a robot emoji"  
+"Make OpenAI the default provider"
+"Set default model to gpt-4"
+"Turn off directory restoration"
+"Change the prompt indicator to a star"
+```
+
+**Configuration Options:**
+- `default_provider`: "openai", "gemini", or "lmstudio"
+- `default_model`: Model name (provider-specific, e.g., "gpt-4", "gemini-pro")
+- `default_mode`: "chat" or "shell" 
+- `agent_prompt_indicator`: Symbol shown in shell prompt (⭐, 🤖, etc.)
+- `preserve_initial_location`: Return to starting directory on exit (true/false)
+- `completion_enabled`: Enable tab completion (true/false)
+- `history_length`: Number of commands to keep in history
+
+**Manual Configuration:**
+Settings are stored in `~/.cliagent/settings.json` and can be edited directly:
+```json
+{
+  "version": "0.3.0",
+  "default_provider": "openai",
+  "default_model": null,
+  "default_mode": "shell",
+  "agent_prompt_indicator": "⭐",
+  "preserve_initial_location": true,
+  "completion_enabled": true,
+  "history_length": 1000
+}
+```
+
 ## Usage
 
-### Chat Mode (Default)
+The CLI agent automatically uses your saved configuration as defaults for all arguments.
+
+### Chat Mode
 
 Interactive conversation interface with User:/Agent: style prompts:
 
 ```bash
-# Using installed CLI tool
+# Using installed CLI tool (uses your default mode from config)
 cli-agent
 
-# Or run directly
-python main.py
+# Force chat mode
+cli-agent --mode chat
 
-# Use different providers
+# Use different providers (or set as default via config)
 cli-agent --provider gemini
 cli-agent --provider lmstudio
 
-# Use custom model
-cli-agent --provider openai --model gpt-3.5-turbo
+# Use custom model (or set as default via config)
+cli-agent --provider openai --model gpt-4
 
 # Enable verbose mode for debugging
 cli-agent --verbose --provider gemini
@@ -141,38 +220,70 @@ cli-agent --verbose --provider gemini
 
 ### Shell Mode
 
-Shell-like interface with intelligent command routing. Executes shell commands directly, falls back to LLM for natural language:
+Shell-like interface with intelligent command routing and visual agent indicator:
 
 ```bash
-# Shell interface with standard prompt
-cli-agent --shell
+# Shell interface with enhanced prompt  
+cli-agent --mode shell
 
 # Use different providers in shell mode
-cli-agent --shell --provider gemini
-cli-agent --shell --provider lmstudio
+cli-agent --mode shell --provider gemini
 
 # Enable trace mode to see LLM execution details
-cli-agent --shell --trace
+cli-agent --mode shell --trace
 
-# Or set environment variable
-CLI_AGENT_TRACE=1 cli-agent --shell
+# Don't restore initial directory on exit
+cli-agent --mode shell --no-restore
+
+# Or set environment variable for trace
+CLI_AGENT_TRACE=1 cli-agent --mode shell
+```
+
+#### Enhanced Shell Features
+
+**Visual Agent Indicator:**
+```bash
+⭐ user@host:~/project$  # Agent mode (indicator configurable)
+user@host:~/project$   # Regular shell
+```
+
+**Universal Tab Completion:**
+- Works with all commands and paths
+- No need for specific command lists
+- Supports both GNU readline and macOS libedit
+
+**Smart Directory Handling:**
+```bash
+⭐ user@host:~/project$ cd /tmp
+⭐ user@host:/tmp$ pwd
+/tmp
+⭐ user@host:/tmp$ exit  # Returns to ~/project if preserve_initial_location=true
 ```
 
 #### Shell Mode Examples
 
 ```bash
-# Direct shell commands - executed immediately
-anfedoro@MBP4Max:~/project$ ls -la
+# Direct shell commands - executed immediately  
+⭐ user@host:~/project$ ls -la
 total 48
 drwxr-xr-x  12 user  staff   384 Aug 21 10:30 .
 drwxr-xr-x   5 user  staff   160 Aug 21 10:29 ..
 -rw-r--r--   1 user  staff  1234 Aug 21 10:30 README.md
 
 # Natural language - processed by LLM
-anfedoro@MBP4Max:~/project$ find all python files and count lines
+⭐ user@host:~/project$ find all python files and count lines
 🛠️  Executing command: find . -name "*.py" -type f
 🛠️  Executing command: find . -name "*.py" -type f -exec wc -l {} + | tail -1
 Total lines across all Python files: 2,847 lines
+
+# Configuration through natural language
+⭐ user@host:~/project$ change the prompt indicator to a robot emoji
+Configuration updated successfully!
+Applied changes: {'agent_prompt_indicator': '🤖'}
+
+🤖 user@host:~/project$ set default mode to chat  
+Configuration updated successfully!
+Applied changes: {'default_mode': 'chat'}
 ```
 
 ### Command Line Options
@@ -182,18 +293,16 @@ cli-agent --help
 ```
 
 Options:
-- `--provider {openai,gemini,lmstudio}` or `-p`: Choose LLM provider (default: openai)
-- `--model MODEL` or `-m`: Specify custom model for the selected provider
-- `--shell` or `-s`: Run in shell mode with intelligent command routing
+- `--provider {openai,gemini,lmstudio}` or `-p`: Choose LLM provider (default: from config)
+- `--model MODEL` or `-m`: Specify custom model for the selected provider (default: from config)
+- `--mode {chat,shell}`: Choose interface mode (default: from config)
 - `--verbose` or `-v`: Show detailed token usage information
-- `--trace` or `-t`: Enable trace mode (show LLM execution details)
+- `--trace` or `-t`: Enable trace mode (show LLM execution details, shell mode only)
 - `--no-reasoning`: Disable reasoning for faster responses (LM Studio only)
-- `--model MODEL` or `-m`: Specify model name for the selected provider
-- `--verbose` or `-v`: Show detailed token usage and debug information (chat mode)
-- `--shell` or `-s`: Run in shell mode with standard prompt and intelligent routing
-- `--trace` or `-t`: Enable trace mode (shell mode only)
-- `--no-reasoning`: Disable reasoning process for faster responses (LM Studio)
+- `--no-restore`: Don't restore initial directory on exit (shell mode only)
 - `--help` or `-h`: Show help message
+
+**Note**: All defaults are read from your `~/.cliagent/settings.json` configuration.
 
 ### Shell Mode Features
 
@@ -201,15 +310,21 @@ Options:
 - Shell commands executed directly: `ls -la`, `grep pattern *.py`, `git status`
 - Natural language processed by LLM: `analyze this code`, `what files are here`
 
-**Standard Shell Experience:**
-- Normal shell prompt format: `user@host:path$`
-- Tab completion for commands and paths
-- Command history navigation
+**Enhanced Shell Experience:**
+- Visual agent indicator: Configurable symbol (⭐, 🤖, etc.) shows agent mode
+- Universal tab completion: Works with all commands and file paths
+- Proper built-in commands: `cd` and `pwd` actually change the working directory
+- Directory preservation: Optional return to starting directory on exit
 
 **Silent LLM Mode:**
 - No intermediate "Agent is analyzing..." messages
 - Clean output like a normal shell
 - Enable trace mode to see LLM execution details
+
+**Natural Language Configuration:**
+- Change settings on the fly: "set default provider to gemini"
+- Persistent across sessions: Settings saved automatically
+- No need to edit config files manually
 
 ### Example Interactions
 
@@ -232,19 +347,23 @@ You: Find all Python files and count lines of code
 
 **Shell Mode:**
 ```bash
-user@host:project$ ls -la                 # Direct shell execution
+⭐ user@host:project$ ls -la                    # Direct shell execution
 total 48
 drwxr-xr-x  12 user  staff   384 Aug 21 10:30 .
 ...
 
-user@host:project$ analyze this code      # LLM processing
+⭐ user@host:project$ analyze this code         # LLM processing
 🛠️  Executing command: find . -name "*.py" -type f
 🛠️  Executing command: head -20 main.py
 Based on the code analysis, this appears to be...
 
-user@host:project$ git status            # Direct shell execution  
+⭐ user@host:project$ git status              # Direct shell execution  
 On branch main
 Your branch is up to date with 'origin/main'.
+
+⭐ user@host:project$ change default mode to chat  # Configuration update
+Configuration updated successfully!
+Applied changes: {'default_mode': 'chat'}
 ```
 
 ### Security Features
@@ -267,50 +386,60 @@ Agent: It seems tokei is not installed. To complete this task, I need to install
 The new modular architecture provides clean APIs for programmatic use:
 
 ```python
-from core_agent import AgentConfig, LLMProvider
+from agent.core_agent import LLMProvider, process_user_message
 
-# Create agent configuration
-config = AgentConfig(LLMProvider.OPENAI, model="gpt-4")
-config.initialize_client()
+# Create configuration
+from agent.config import load_settings
+settings = load_settings()
 
 # Process messages through core agent
-from core_agent import process_user_message
-response = process_user_message(
+from agent.core_agent import process_message_with_functions
+response = process_message_with_functions(
     "List all running processes",
-    config.provider,
-    config.client,
-    config.chat_history
+    LLMProvider.OPENAI,
+    history=[]
 )
 print(response)
 
-# Use chat interface programmatically
-from chat_interface import handle_chat_message
-response = handle_chat_message("show system info", config)
+# Use configuration management
+from agent.config import update_configuration
+result = update_configuration({
+    'default_provider': 'gemini',
+    'agent_prompt_indicator': '🚀'
+})
+print(result['message'])
 
-# Use shell interface for smart execution
-from shell_interface import smart_execute_with_fallback
-is_shell, output = smart_execute_with_fallback("ls -la", config)
+# Use chat interface programmatically
+from interface.chat_interface import chat_main
+
+# Use shell interface for smart execution  
+from interface.shell_interface import smart_execute_with_fallback
+is_shell, output = smart_execute_with_fallback("ls -la")
 ```
 
 ## Project Structure
 
 ```
 llm_agent/
-├── core_agent.py            # Pure agent backend with LLM logic
-├── chat_interface.py        # Interactive chat frontend
-├── shell_interface.py       # Shell interface with smart routing  
-├── main.py                  # Unified entry point
-├── providers/               # Provider modules
+├── agent/                   # Core agent logic
+│   ├── __init__.py         # Agent module exports
+│   ├── core_agent.py       # Pure agent backend with centralized tools
+│   ├── config.py           # Configuration management with LLM updates
+│   └── utils.py            # System utilities and shell prompt generation
+├── interface/              # User interface frontends
+│   ├── chat_interface.py   # Interactive chat frontend
+│   └── shell_interface.py  # Shell interface with smart routing
+├── input_handler/          # Enhanced input handling
+│   └── input_handler.py    # Universal tab completion and history
+├── providers/              # Provider modules (API communication only)
 │   ├── __init__.py         # Exports function dictionaries
 │   ├── functions.py        # Tool definitions and mappings
 │   ├── openai.py          # OpenAI-specific implementation
 │   ├── gemini.py          # Gemini-specific implementation
 │   └── lmstudio.py        # LM Studio-specific implementation
-├── input_handler.py        # Enhanced input with history/completion
-├── utils.py                # System utilities and context
+├── main.py                 # Unified entry point with config-based defaults
 ├── tests/                  # Comprehensive test suite
 │   ├── test_agent.py      # Agent backend tests
-│   ├── test_shell_interface.py  # Shell interface tests
 │   ├── test_input_handler.py    # Input handler tests
 │   └── test_utils.py      # Utilities tests
 ├── pyproject.toml          # Project configuration and dependencies
@@ -321,42 +450,73 @@ llm_agent/
 
 ### Architecture Overview
 
-The project follows clean architecture principles with three main layers:
+The project follows clean architecture principles with clear separation of concerns:
 
-1. **Core Agent** (`core_agent.py`):
+1. **Core Agent** (`agent/core_agent.py`):
    - Pure business logic for LLM processing
    - Multi-iteration execution with function calling
+   - Centralized tool definitions (used by all providers)
    - Provider-agnostic message handling
-   - Configuration management via `AgentConfig`
 
-2. **Interface Frontends**:
-   - **Chat Interface** (`chat_interface.py`): Interactive conversation mode
-   - **Shell Interface** (`shell_interface.py`): Shell-like interface with smart routing
+2. **Configuration Management** (`agent/config.py`):
+   - Persistent settings in `~/.cliagent/settings.json`
+   - Natural language configuration updates via LLM
+   - Default value management for CLI arguments
 
-3. **Provider Abstraction** (`providers/`):
+3. **Interface Frontends**:
+   - **Chat Interface** (`interface/chat_interface.py`): Interactive conversation mode
+   - **Shell Interface** (`interface/shell_interface.py`): Enhanced shell with visual indicators
+
+4. **Provider Abstraction** (`providers/`):
+   - Providers only handle API communication
    - Unified function mapping dictionaries  
-   - Provider-specific implementations
+   - Tools defined centrally in core agent, not duplicated per provider
    - OpenAI-compatible format for consistency
+
+5. **Enhanced Input** (`input_handler/`):
+   - Universal tab completion (works with all commands)
+   - Cross-platform readline/libedit support
+   - Command history management
 
 ### Provider Architecture
 
-The agent uses a modular provider system with function mapping dictionaries:
+The agent uses a modular provider system where providers focus solely on API communication:
 
 ```python
-# providers/functions.py
-INITIALIZE_CLIENT = {
-    "openai": openai.initialize_client,
-    "gemini": gemini.initialize_client,
-    "lmstudio": lmstudio.initialize_client,
-}
+# agent/core_agent.py - Centralized tool definitions
+def get_agent_tools() -> List[Dict[str, Any]]:
+    """All LLM tools defined once, used by all providers."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "run_shell_command",
+                "description": "Execute shell command...",
+                # ... tool definition
+            }
+        },
+        {
+            "type": "function", 
+            "function": {
+                "name": "update_agent_configuration",
+                "description": "Update CLI agent settings...",
+                # ... tool definition
+            }
+        }
+    ]
 
-SEND_MESSAGE = {
-    "openai": openai.send_message,
-    "gemini": gemini.send_message,
-    "lmstudio": lmstudio.send_message,
-}
-# ... other function mappings
+# providers/openai.py - Provider only handles API
+def get_available_tools() -> List[Dict[str, Any]]:
+    """Return centralized tool definitions."""
+    from agent.core_agent import get_agent_tools
+    return get_agent_tools()
 ```
+
+**Key Benefits:**
+- No tool duplication across providers
+- Single source of truth for all LLM capabilities  
+- Providers focus only on API communication
+- Easy to add new tools (define once, works everywhere)
 
 ### Execution Flow
 
@@ -375,9 +535,11 @@ SEND_MESSAGE = {
 
 **Core Agent Processing:**
 1. Initialize chat history and system context
-2. Send message to selected LLM provider
+2. Send message to selected LLM provider with centralized tools
 3. Extract function calls if present
-4. Execute shell commands via `run_shell_command` tool
+4. Execute tools via centralized `execute_tool()` function:
+   - `run_shell_command`: Execute shell commands
+   - `update_agent_configuration`: Modify persistent settings via natural language
 5. Add results back to conversation
 6. Repeat until task complete (max 10 iterations)
 
@@ -419,9 +581,10 @@ The modular architecture makes it easy to add new LLM providers. Here's how:
 Create a new file `providers/your_provider.py`:
 
 ```python
-import os
-from typing import Any, Dict, List
-from openai import OpenAI  # or your provider's client
+def get_available_tools() -> List[Dict[str, Any]]:
+    """Return centralized tool definitions."""
+    from agent.core_agent import get_agent_tools
+    return get_agent_tools()
 
 def initialize_client() -> Any:
     """Initialize client for your provider."""
@@ -430,57 +593,10 @@ def initialize_client() -> Any:
         raise ValueError("YOUR_PROVIDER_API_KEY environment variable not found.")
     return YourProviderClient(api_key=api_key)
 
-def get_available_tools() -> List[Dict[str, Any]]:
-    """Return tool definitions in OpenAI format."""
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": "run_shell_command",
-                "description": "Execute shell command in terminal and return execution result",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "Shell command to execute, e.g. 'ls -la /tmp'",
-                        }
-                    },
-                    "required": ["command"],
-                },
-            },
-        }
-    ]
-
-def get_display_name() -> str:
-    """Get display name for this provider."""
-    return "Your Provider Name"
-
-def send_message(client, messages, model_name=None):
-    """Send message to your provider's API."""
-    # Implement API call logic
-    pass
-
-def extract_function_calls(response):
-    """Extract function calls from response."""
-    # Implement function call extraction
-    pass
-
-def add_function_result_to_messages(messages, response, function_results):
-    """Add function results to message history."""
-    # Implement result addition logic
-    pass
-
-def extract_usage_info(response):
-    """Extract token usage information."""
-    # Return dict with prompt_tokens, completion_tokens, total_tokens
-    pass
-
-def get_response_text(response):
-    """Extract response text."""
-    # Return the text content from response
-    pass
+# ... other required functions (send_message, extract_function_calls, etc.)
 ```
+
+**Important**: Don't duplicate tool definitions! Use `get_agent_tools()` from core agent.
 
 ### Step 2: Add to Enum
 
@@ -501,12 +617,6 @@ Add your provider to each dictionary in `providers/functions.py`:
 ```python
 from . import gemini, openai, your_provider  # Add import
 
-INITIALIZE_CLIENT = {
-    "openai": openai.initialize_client,
-    "gemini": gemini.initialize_client,
-    "your_provider": your_provider.initialize_client,  # Add this
-}
-
 GET_AVAILABLE_TOOLS = {
     "openai": openai.get_available_tools,
     "gemini": gemini.get_available_tools,
@@ -515,6 +625,8 @@ GET_AVAILABLE_TOOLS = {
 
 # Add to all other function dictionaries...
 ```
+
+Tools are automatically available since your provider uses `get_agent_tools()`.
 
 ### Step 4: Update CLI Options
 
@@ -537,12 +649,16 @@ That's it! The agent will automatically work with your new provider through the 
 This project helps understand:
 
 1. **Function Calling Architecture**: How to define tools that language models can invoke
-2. **Provider Abstraction**: Building unified interfaces for different APIs
-3. **Security in AI Systems**: Implementing safeguards for agent systems
-4. **Modular Design**: Creating extensible architectures
-5. **Agent Planning**: How models break down complex requests into executable steps
-6. **Tool Integration**: Bridging language models with external systems
-7. **Iterative Execution**: Managing multi-step workflows
+2. **Provider Abstraction**: Building unified interfaces for different APIs where providers focus on communication
+3. **Centralized Tool Management**: Single source of truth for all LLM capabilities
+4. **Configuration Management**: Persistent settings with natural language updates
+5. **Enhanced User Experience**: Visual indicators, universal tab completion, smart command routing
+6. **Security in AI Systems**: Implementing safeguards for agent systems
+7. **Modular Design**: Creating extensible architectures with clear separation of concerns
+8. **Agent Planning**: How models break down complex requests into executable steps
+9. **Tool Integration**: Bridging language models with external systems
+10. **Iterative Execution**: Managing multi-step workflows
+11. **Natural Language Interfaces**: Configuration and control through conversation
 
 ## Supported Providers
 
@@ -588,25 +704,29 @@ This modular implementation can be extended to explore:
 
 - **Additional Interfaces**: Web UI, API server, VS Code extension
 - **Enhanced Providers**: Anthropic Claude, local models (Ollama)
-- **Advanced Tools**: File operations, web requests, database queries
-- **Persistent Memory**: Conversation history, learned preferences
+- **Advanced Tools**: File operations, web requests, database queries, code execution
+- **Persistent Memory**: Conversation history, learned preferences, user context
 - **Smart Routing**: More sophisticated command vs NL detection
-- **Security Enhancements**: Sandboxing, granular permissions
-- **Performance**: Streaming responses, async execution
+- **Enhanced Configuration**: Plugin system, custom tool definitions
+- **Security Enhancements**: Sandboxing, granular permissions, audit logging
+- **Performance**: Streaming responses, async execution, caching
 - **Agent Orchestration**: Multi-agent collaboration
 - **Tool Composition**: Complex multi-step tool chains
+- **Natural Language APIs**: Voice interfaces, conversational configuration
 
 ## What This Project Teaches
 
-- **Clean Architecture**: Separation of concerns, dependency inversion
-- **Provider Patterns**: Abstraction layers, strategy pattern implementation  
-- **LLM Integration**: Function calling, multi-iteration logic
-- **CLI Design**: Multiple interface modes, user experience
+- **Clean Architecture**: Separation of concerns, dependency inversion, centralized logic
+- **Provider Patterns**: Abstraction layers where providers focus solely on API communication  
+- **LLM Integration**: Function calling, multi-iteration logic, centralized tool definitions
+- **Enhanced UX Design**: Visual indicators, universal input handling, natural language configuration
+- **Configuration Management**: Persistent settings, natural language updates, default management
+- **CLI Design**: Multiple interface modes, dynamic defaults from configuration
 - **Testing Strategy**: Mocking external APIs, comprehensive coverage
 - **Security Mindset**: Safe execution, permission controls
-- **Modular Design**: Easy extension and maintenance
+- **Modular Design**: Easy extension and maintenance, single responsibility principle
 
-The codebase serves as a practical example of how to build robust, extensible LLM agent systems with proper architecture and testing.
+The codebase serves as a practical example of how to build robust, extensible LLM agent systems with proper architecture, user experience, and natural language configuration capabilities.
 
 ## Examples
 

@@ -25,6 +25,57 @@ from agent.utils import format_system_context
 # Load environment variables from .env file
 load_dotenv()
 
+
+def get_agent_tools() -> List[Dict[str, Any]]:
+    """Централизованное определение всех доступных инструментов для агента."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "run_shell_command",
+                "description": "Execute shell command in terminal and return execution result",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "Shell command to execute, e.g. 'ls -la /tmp' or 'grep -r pattern .'",
+                        },
+                        "estimated_timeout": {
+                            "type": "integer",
+                            "description": "Estimated timeout in seconds (5-300). Consider command complexity: find/du operations need 60-300s, simple commands like ls/ps need 5-30s",
+                            "minimum": 5,
+                            "maximum": 300,
+                            "default": 30,
+                        },
+                    },
+                    "required": ["command"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "update_agent_configuration",
+                "description": "Update CLI agent configuration settings (default provider, model, mode, prompt indicator, etc.)",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "default_provider": {"type": "string", "enum": ["openai", "gemini", "lmstudio"], "description": "Default LLM provider (openai, gemini, lmstudio)"},
+                        "default_model": {"type": "string", "description": "Default model name (provider-specific, e.g. 'gpt-4', 'gemini-pro', null for provider default)"},
+                        "default_mode": {"type": "string", "enum": ["chat", "shell"], "description": "Default startup mode (chat or shell)"},
+                        "agent_prompt_indicator": {"type": "string", "description": "Symbol shown in shell prompt when in agent mode (e.g. '⭐', '🤖', '>')"},
+                        "preserve_initial_location": {"type": "boolean", "description": "Whether to return to starting directory when exiting shell mode"},
+                        "completion_enabled": {"type": "boolean", "description": "Whether to enable tab completion in shell mode"},
+                        "history_length": {"type": "integer", "minimum": 1, "description": "Number of commands to keep in history"},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+    ]
+
+
 # Configuration constants for the agent
 MAX_AGENT_ITERATIONS = 10
 MAX_CONTEXT_TOKENS = 4000
@@ -164,6 +215,24 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
             return f"Error: Command timed out after {timeout} seconds"
         except Exception as e:
             return f"Error executing command: {str(e)}"
+
+    elif function_name == "update_agent_configuration":
+        from agent.config import update_configuration
+
+        if verbose:
+            print(f"[DEBUG] Updating configuration with: {function_args}")
+
+        result = update_configuration(function_args)
+
+        if verbose:
+            print(f"[DEBUG] Configuration update result: {result}")
+
+        # Return human-readable result
+        if result["success"]:
+            return f"Configuration updated successfully!\n{result['message']}\nUpdated settings: {result['updated_settings']}"
+        else:
+            return f"Configuration update failed: {result['message']}"
+
     else:
         return f"Unknown function: {function_name}"
 
