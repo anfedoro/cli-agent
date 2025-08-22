@@ -1,11 +1,11 @@
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-from ._shared import prepare_chat_completion_params
+from ._shared import prepare_chat_completion_params, extract_unsupported_parameter, is_parameter_error
 
 # Load environment variables
 load_dotenv()
@@ -27,32 +27,9 @@ def is_no_reasoning() -> bool:
 
 def get_available_tools() -> List[Dict[str, Any]]:
     """Return available tool definitions for LM Studio API using OpenAI format."""
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": "run_shell_command",
-                "description": "Execute shell command in terminal and return execution result",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "Shell command to execute, e.g. 'ls -la /tmp' or 'grep -r \"pattern\" .'",
-                        },
-                        "estimated_timeout": {
-                            "type": "integer",
-                            "description": "Estimated timeout in seconds (5-300). Consider command complexity: find/du operations need 60-300s, simple commands like ls/ps need 5-30s",
-                            "minimum": 5,
-                            "maximum": 300,
-                            "default": 30,
-                        },
-                    },
-                    "required": ["command"],
-                },
-            },
-        }
-    ]
+    from agent.core_agent import get_agent_tools
+
+    return get_agent_tools()
 
 
 def initialize_client() -> OpenAI:
@@ -65,23 +42,34 @@ def initialize_client() -> OpenAI:
     return OpenAI(api_key=api_key, base_url=base_url)
 
 
-def get_model_name() -> str:
-    """Get the default model name for LM Studio."""
-    # This should be overridden by the user-specified model
-    return "lmstudio-community/qwen2.5-7b-instruct"
-
-
 def get_display_name(model_name: str) -> str:
     """Get the display name for LM Studio with the specified model."""
     return f"LM Studio - Model: {model_name}"
 
 
-def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: Optional[str] = None) -> Any:
-    """Send message to LM Studio API (unified logic)."""
-    model_to_use = model_name or get_model_name()
-    params = prepare_chat_completion_params("lmstudio", model_to_use, messages, get_available_tools())
-    # Potential future reasoning flags could be injected here based on _no_reasoning
-    return client.chat.completions.create(**params)  # type: ignore
+def send_message(client: OpenAI, messages: List[ChatCompletionMessageParam], model_name: str) -> Any:
+    """Send message to LM Studio API with error handling for unsupported parameters."""
+    params = prepare_chat_completion_params("lmstudio", model_name, messages, get_available_tools())
+
+    try:
+        return client.chat.completions.create(**params)  # type: ignore
+    except Exception as e:
+        # Check if error is about unsupported parameter
+        if is_parameter_error(e):
+            unsupported_param = extract_unsupported_parameter(e)
+            if unsupported_param and unsupported_param in params:
+                # Remove unsupported parameter and retry
+                params_retry = params.copy()
+                del params_retry[unsupported_param]
+
+                try:
+                    return client.chat.completions.create(**params_retry)  # type: ignore
+                except Exception:
+                    # If retry also fails, raise the original error
+                    raise e
+
+        # For other errors or if we couldn't identify the parameter, raise immediately
+        raise e
 
 
 def extract_function_calls(response) -> List[Dict[str, Any]]:
