@@ -1,4 +1,4 @@
-"""Provider modules for LLM Terminal Agent.
+"""Provider modules for CLI Agent.
 
 This module contains provider-specific implementations for different LLM APIs.
 Each provider module should implement the same set of functions to ensure compatibility.

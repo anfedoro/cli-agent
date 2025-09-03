@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cli-agent"
 version = "0.3.0"
-description = "LLM Terminal Agent supporting multiple providers"
+description = "CLI Agent supporting multiple LLM providers"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

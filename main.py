@@ -15,7 +15,7 @@ def main():
     default_model = get_setting("default_model", None)
     default_mode = get_setting("default_mode", "chat")
 
-    parser = argparse.ArgumentParser(description="LLM Terminal Agent")
+    parser = argparse.ArgumentParser(description="CLI Agent")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed token usage information")
     parser.add_argument("--provider", "-p", choices=["openai", "gemini", "lmstudio"], default=default_provider, help=f"LLM provider to use (default: {default_provider})")
     parser.add_argument("--model", "-m", default=default_model, help="Model to use for the selected provider")

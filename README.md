@@ -1,4 +1,4 @@
-# LLM Terminal Agent
+# CLI Agent
 
 A modular Python project for learning LLM agent principles through practical implementation. Features unified architecture with multiple interfaces and support for OpenAI, Google Gemini, and LM Studio providers with Function Calling capabilities.
 
@@ -86,7 +86,7 @@ The project follows clean architecture principles with clear separation between 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd llm_agent
+cd cli-agent
 ```
 
 2. Install dependencies:
@@ -420,7 +420,7 @@ is_shell, output = smart_execute_with_fallback("ls -la")
 ## Project Structure
 
 ```
-llm_agent/
+cli-agent/
 ├── agent/                   # Core agent logic
 │   ├── __init__.py         # Agent module exports
 │   ├── core_agent.py       # Pure agent backend with centralized tools
