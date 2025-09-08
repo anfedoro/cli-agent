@@ -8,6 +8,8 @@ while still handling provider-specific parameter differences.
 from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional, Union
+import re
+import os
 
 from openai import APIError, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
@@ -152,31 +154,124 @@ def is_parameter_error(error: Union[Exception, str]) -> bool:
     return False
 
 
+def _get_reasoning_model_patterns(provider: str) -> List[str]:
+    """Get reasoning model patterns from ENV/config with sensible defaults per provider.
+
+    - ENV can override via CLI_AGENT_REASONING_MODELS or CLI_AGENT_REASONING_MODELS_<PROVIDER>
+    - Config can override via `reasoning_model_patterns` mapping {provider: [patterns]}
+    - Patterns are treated as regex (case-insensitive). If plain text is given, it's used as substring regex.
+    """
+    patterns: List[str] = []
+
+    # Provider-specific env override
+    per_provider_env = os.getenv(f"CLI_AGENT_REASONING_MODELS_{provider.upper()}")
+    if per_provider_env:
+        patterns.extend([p.strip() for p in per_provider_env.split(",") if p.strip()])
+
+    # Global env fallback
+    global_env = os.getenv("CLI_AGENT_REASONING_MODELS")
+    if global_env:
+        patterns.extend([p.strip() for p in global_env.split(",") if p.strip()])
+
+    # Config mapping
+    try:
+        from agent.config import get_setting
+
+        cfg_map = get_setting("reasoning_model_patterns", None)
+        if isinstance(cfg_map, dict):
+            extra = cfg_map.get(provider)
+            if isinstance(extra, list):
+                patterns.extend([str(p) for p in extra])
+    except Exception:
+        pass
+
+    # Sensible defaults per provider
+    if not patterns:
+        if provider == "openai":
+            patterns = [
+                r"^o\d+.*",  # o-series like o1, o3, etc.
+                r"^gpt-5(\b|-)",  # gpt-5 family, e.g., gpt-5, gpt-5-mini
+                r"^gpt-4o-reasoning\b",  # explicit 4o reasoning variants
+                r"^gpt-o\b",  # gpt-o family
+            ]
+        elif provider == "gemini":
+            # Broadly treat *pro* variants as reasoning-capable (user request)
+            patterns = [r"gemini.*pro"]
+        else:
+            patterns = []
+
+    return patterns
+
+
+def _is_reasoning_model(provider: str, model: str) -> bool:
+    """Detect reasoning models using provider-aware pattern lists."""
+    if not model:
+        return False
+    patterns = _get_reasoning_model_patterns(provider)
+    m = model.lower()
+    for pat in patterns:
+        try:
+            # If pattern looks like a bare word, treat as substring, else regex
+            regex = pat
+            # Allow simple wildcard '*'
+            if "*" in regex:
+                regex = regex.replace("*", ".*")
+            if re.search(regex, m, re.IGNORECASE):
+                return True
+        except re.error:
+            # Fallback to substring match if regex is invalid
+            if pat.lower() in m:
+                return True
+    return False
+
+
+def _apply_generation_settings(params: Dict[str, Any], provider: str, model: str) -> None:
+    """Apply configurable generation settings safely based on model capabilities."""
+    try:
+        from agent.config import get_setting
+    except Exception:
+        return
+
+    is_reasoning = _is_reasoning_model(provider, model)
+
+    # Temperature: exclude for reasoning models; include for others if set
+    temperature = get_setting("temperature", None)
+    if temperature is not None and not is_reasoning:
+        try:
+            t = float(temperature)
+            if 0.0 <= t <= 2.0:
+                params["temperature"] = t
+        except Exception:
+            pass
+
+    # Reasoning effort: include only for reasoning models (and only for OpenAI for now)
+    reasoning_effort = get_setting("reasoning_effort", None)
+    if is_reasoning and provider == "openai" and isinstance(reasoning_effort, str) and reasoning_effort:
+        params["reasoning_effort"] = reasoning_effort
+
+    # Reasoning verbosity (optional): include only for reasoning models if explicitly set
+    reasoning_verbosity = get_setting("reasoning_verbosity", None)
+    if is_reasoning and provider == "openai" and isinstance(reasoning_verbosity, str) and reasoning_verbosity:
+        # Use a conservative key; if unsupported, providers/openai retry logic will drop it
+        params["reasoning_verbosity"] = reasoning_verbosity
+
+
 def prepare_chat_completion_params(provider: str, model: str, messages: List[ChatCompletionMessageParam], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Prepare kwargs for client.chat.completions.create.
 
-    Unifies logic across providers while respecting subtle API differences.
-
-    Rules:
-    - Always include model, messages, tools, tool_choice="auto".
-    - For lmstudio (local server) use `max_tokens` (widely supported keyword)
-      because some local OpenAI-compatible servers ignore / reject `max_completion_tokens`.
-    - For cloud providers (openai, gemini) prefer `max_completion_tokens` and include
-      a gentle `reasoning_effort` hint where supported (OpenAI currently supports it; if
-      a provider ignores it, it's harmless).
+    Use only parameters compatible with OpenAI Chat Completions API and most
+    OpenAI-compatible servers:
+    - model, messages, tools, tool_choice="auto"
+    - max_completion_tokens (not max_tokens)
+    - Do NOT include experimental parameters like reasoning_effort by default
     """
     base: Dict[str, Any] = {
         "model": model,
         "messages": messages,
         "tools": tools,
         "tool_choice": "auto",
-        "reasoning_effort": "low",  # for reasoning models like o1-mini
+        "max_completion_tokens": _DEFAULT_MAX_TOKENS,
     }
-
-    if provider == "lmstudio":
-        base["max_tokens"] = _DEFAULT_MAX_TOKENS
-
-    else:
-        base["max_completion_tokens"] = _DEFAULT_MAX_TOKENS
-
+    # Apply model-aware generation parameters and config-driven knobs
+    _apply_generation_settings(base, provider, model)
     return base

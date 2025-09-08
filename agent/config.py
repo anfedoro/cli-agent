@@ -158,7 +158,23 @@ def update_configuration(updates: dict) -> dict:
         current_settings = load_settings()
 
         # Validate and apply updates
-        valid_keys = {"default_provider", "default_model", "default_mode", "agent_prompt_indicator", "preserve_initial_location", "completion_enabled", "history_length"}
+        valid_keys = {
+            "default_provider",
+            "default_model",
+            "default_mode",
+            "agent_prompt_indicator",
+            "preserve_initial_location",
+            "completion_enabled",
+            "history_length",
+            # execution controls
+            "shell_command_timeout_seconds",
+            "tool_command_timeout_seconds",
+            # generation controls
+            "temperature",
+            "reasoning_effort",
+            "reasoning_verbosity",
+            "reasoning_model_patterns",  # mapping provider -> list of patterns
+        }
 
         valid_providers = {"openai", "gemini", "lmstudio"}
         valid_modes = {"chat", "shell"}
@@ -179,6 +195,47 @@ def update_configuration(updates: dict) -> dict:
                 continue
             elif key == "history_length" and (not isinstance(value, int) or value < 1):
                 continue
+            elif key in ["shell_command_timeout_seconds", "tool_command_timeout_seconds"]:
+                # Accept int > 0, or 0/None to disable
+                if value is None:
+                    pass
+                elif not isinstance(value, int):
+                    continue
+                elif value < 0:
+                    continue
+            elif key == "temperature":
+                # Accept float in [0,2]; None to unset
+                if value is None:
+                    pass
+                elif not isinstance(value, (int, float)):
+                    continue
+                elif not (0.0 <= float(value) <= 2.0):
+                    continue
+            elif key == "reasoning_effort":
+                # Accept known strings; leniently allow any string
+                if value is None:
+                    pass
+                elif not isinstance(value, str):
+                    continue
+            elif key == "reasoning_verbosity":
+                if value is None:
+                    pass
+                elif not isinstance(value, str):
+                    continue
+            elif key == "reasoning_model_patterns":
+                # Expect dict[str, list[str]]
+                if value is None:
+                    pass
+                elif not isinstance(value, dict):
+                    continue
+                else:
+                    ok = True
+                    for k, v in value.items():
+                        if not isinstance(k, str) or not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+                            ok = False
+                            break
+                    if not ok:
+                        continue
 
             updated_settings[key] = value
             applied_updates[key] = value

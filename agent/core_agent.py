@@ -7,6 +7,7 @@ Core LLM Agent - чистая логика обработки запросов �
 
 from enum import Enum
 from typing import Any, Dict, List, Tuple, Union, Optional
+import json
 
 from dotenv import load_dotenv
 
@@ -20,7 +21,7 @@ from providers import (
     INITIALIZE_CLIENT,
     SEND_MESSAGE,
 )
-from agent.utils import format_system_context, get_subprocess_kwargs
+from agent.utils import format_system_context, get_subprocess_kwargs, get_timeout_seconds, should_run_interactive
 
 # Load environment variables from .env file
 load_dotenv()
@@ -51,6 +52,14 @@ def get_agent_tools() -> List[Dict[str, Any]]:
                     },
                     "required": ["command"],
                 },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_agent_configuration",
+                "description": "Get current CLI agent configuration settings (read-only)",
+                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
             },
         },
         {
@@ -124,6 +133,7 @@ COMPLETION RULES:
 	•	After 2-3 unsuccessful attempts, explain the issue clearly and propose alternatives.
 	•	Respond concisely, informatively, and in the user's prompt language.
 	•	Maintain original output formatting unless explicitly instructed otherwise.
+    •	Result should be visually separated from rest of the response, such as comments, recommendations etc.
 """
 
 
@@ -183,20 +193,39 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
         if not command:
             return "Error: Command not specified"
 
-        # Get timeout from LLM estimation or use default
-        estimated_timeout = function_args.get("estimated_timeout", 30)
-        # Ensure timeout is within reasonable bounds
-        timeout = max(5, min(300, estimated_timeout))
+        # Resolve timeout: settings/env can disable timeout entirely
+        estimated_timeout = function_args.get("estimated_timeout", None)
+        configured_timeout = get_timeout_seconds("tool")
+        if configured_timeout is None:
+            timeout = None
+        else:
+            # If LLM estimated a timeout, respect it but cap by configured_timeout
+            if isinstance(estimated_timeout, int):
+                timeout = min(max(5, estimated_timeout), configured_timeout)
+            else:
+                timeout = configured_timeout
 
         if verbose:
-            print(f"[DEBUG] Using timeout: {timeout}s (estimated: {estimated_timeout}s)")
+            print(f"[DEBUG] Using timeout: {timeout if timeout is not None else 'none'} (estimated: {estimated_timeout})")
 
         try:
             # Execute command through shell
             subprocess_kwargs = get_subprocess_kwargs()
-            subprocess_kwargs.update({"timeout": timeout})
 
-            result = subprocess.run(command, **subprocess_kwargs)
+            # Interactive detection similar to shell mode
+            if should_run_interactive(command):
+                if verbose:
+                    print("[DEBUG] Detected interactive/TUI command; attaching to TTY")
+                subprocess_kwargs.pop("text", None)
+                subprocess_kwargs["capture_output"] = False
+                subprocess_kwargs.pop("timeout", None)
+                result = subprocess.run(command, **subprocess_kwargs)
+                # No captured output; return minimal info
+                return f"Exit code: {result.returncode}\nSTDOUT:\n\nSTDERR:\n"
+            else:
+                if timeout is not None:
+                    subprocess_kwargs.update({"timeout": timeout})
+                result = subprocess.run(command, **subprocess_kwargs)
 
             if verbose:
                 stdout_lines = result.stdout.count("\n") if result.stdout else 0
@@ -212,6 +241,12 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
             return f"Error: Command timed out after {timeout} seconds"
         except Exception as e:
             return f"Error executing command: {str(e)}"
+
+    elif function_name == "get_agent_configuration":
+        from agent.config import load_settings
+
+        settings = load_settings()
+        return json.dumps({"success": True, "settings": settings}, ensure_ascii=False)
 
     elif function_name == "update_agent_configuration":
         from agent.config import update_configuration

@@ -12,11 +12,12 @@ import os
 import platform
 import subprocess
 import sys
+import re
 from typing import Optional, Tuple
 
 from agent.core_agent import AgentConfig, LLMProvider, process_user_message
 from input_handler.input_handler import enhanced_input, is_readline_available, cleanup_input_handler
-from agent.utils import get_shell_prompt, get_subprocess_kwargs
+from agent.utils import get_shell_prompt, get_subprocess_kwargs, should_run_interactive, get_timeout_seconds
 
 
 def clear_screen():
@@ -36,6 +37,13 @@ def smart_execute_with_fallback(input_text: str, config: AgentConfig) -> Tuple[b
         Tuple of (is_shell_result, output)
     """
     trace_enabled = should_show_trace()
+
+    # Heuristic pre-check: clear cases that look like natural language
+    if should_treat_as_natural_language(input_text):
+        if trace_enabled:
+            print("[TRACE] Detected natural language input → routing to LLM")
+        llm_response = process_llm_request(input_text, config)
+        return False, llm_response
 
     # First, try to execute as shell command
     if trace_enabled:
@@ -65,10 +73,33 @@ def smart_execute_with_fallback(input_text: str, config: AgentConfig) -> Tuple[b
 
     is_command_not_found = any(indicator in stderr.lower() for indicator in command_not_found_indicators)
 
-    if is_command_not_found:
-        # This might be natural language or a typo - send to LLM for help
+    # Also treat common shell parse errors as NL to route to LLM
+    parse_error_indicators = [
+        "syntax error",
+        "unexpected token",
+        "unexpected eof",
+        "unterminated",
+        "unmatched",
+        "mismatched",
+        "bad substitution",
+        "parse error",
+        "no closing quote",
+    ]
+
+    looks_like_parse_error = any(ind in stderr.lower() for ind in parse_error_indicators)
+
+    # Special-case: many-word prompts starting with verbs like "make"/"do" tend to be NL
+    starts_like_instruction = starts_with_instruction_like_phrase(input_text)
+
+    if is_command_not_found or looks_like_parse_error or starts_like_instruction:
+        # Likely natural language or non-existent command → ask LLM
         if trace_enabled:
-            print("[TRACE] Command not found - sending to LLM for help")
+            reason = (
+                "command-not-found" if is_command_not_found else
+                "parse-error" if looks_like_parse_error else
+                "instruction-heuristic"
+            )
+            print(f"[TRACE] Routing to LLM due to {reason}")
         llm_response = process_llm_request(input_text, config)
         return False, llm_response
     else:
@@ -118,8 +149,11 @@ def looks_like_command_failure(input_text: str, error_message: str) -> bool:
 def execute_shell_command(command: str) -> Tuple[int, str, str]:
     """Execute shell command and return (exit_code, stdout, stderr)."""
     try:
+        # Normalize command
+        raw = command.strip()
+
         # Handle built-in shell commands that need special treatment
-        command_parts = command.strip().split()
+        command_parts = raw.split()
         if not command_parts:
             return 0, "", ""
 
@@ -150,21 +184,144 @@ def execute_shell_command(command: str) -> Tuple[int, str, str]:
         elif cmd == "pwd":
             return 0, os.getcwd() + "\n", ""
 
-        # For all other commands, use subprocess as before
-        subprocess_kwargs = get_subprocess_kwargs()
-        subprocess_kwargs.update(
-            {
-                "timeout": 300,  # 5 minute timeout
-            }
-        )
+        # For all other commands, choose interactive or captured mode
+        interactive = should_run_interactive(raw, cmd)
 
-        result = subprocess.run(command, **subprocess_kwargs)
-        return result.returncode, result.stdout, result.stderr
+        subprocess_kwargs = get_subprocess_kwargs()
+        if interactive:
+            # Attach to TTY: no capture, no timeout; inherit stdio
+            if should_show_trace():
+                print(f"[TRACE] Launching interactive TUI: {raw}")
+            subprocess_kwargs.pop("text", None)
+            subprocess_kwargs["capture_output"] = False
+            subprocess_kwargs.pop("timeout", None)
+            result = subprocess.run(raw, **subprocess_kwargs)
+            return result.returncode, "", ""
+        else:
+            # Captured mode with timeout
+            timeout = get_timeout_seconds("shell")
+            if timeout is not None:
+                subprocess_kwargs.update({"timeout": timeout})
+            result = subprocess.run(raw, **subprocess_kwargs)
+            return result.returncode, result.stdout, result.stderr
 
     except subprocess.TimeoutExpired:
         return 1, "", "Command timeout (5 minutes exceeded)"
     except Exception as e:
         return 1, "", f"Execution error: {str(e)}"
+
+
+def has_unbalanced_quotes(text: str) -> bool:
+    """Return True if text has odd count of single or double quotes.
+
+    This helps detect natural language like "isn't it" that would break the shell.
+    """
+    single = text.count("'")
+    double = text.count('"')
+    return (single % 2 == 1) or (double % 2 == 1)
+
+
+def has_unbalanced_parentheses(text: str) -> bool:
+    """Return True if parentheses are not balanced.
+
+    We only check counts to stay simple and fast.
+    """
+    return text.count("(") != text.count(")")
+
+
+def contains_cyrillic(text: str) -> bool:
+    """Detect Cyrillic characters (common in Russian natural language prompts)."""
+    return re.search(r"[А-Яа-яЁё]", text) is not None
+
+
+def looks_like_sentence(text: str) -> bool:
+    """Heuristic: sentence-like if many words and sentence punctuation present."""
+    words = text.strip().split()
+    if len(words) >= 5 and any(ch in text for ch in ".?!…"):
+        return True
+    return False
+
+
+def starts_with_instruction_like_phrase(text: str) -> bool:
+    """Detect prompts that start like instructions rather than shell commands.
+
+    Example: "make a folder named test", "do a quick scan of ...".
+    Conservative: only triggers for 3+ words and absence of typical shell tokens.
+    """
+    tokens = text.strip().split()
+    if len(tokens) < 3:
+        return False
+
+    first = tokens[0].lower()
+    if first not in {"make", "do"}:
+        return False
+
+    # If prompt contains clear shell-y tokens, don't trigger this heuristic
+    shelly_chars = set("|;&$><*/=:(){}[]~")
+    if any(ch in shelly_chars for ch in text):
+        return False
+
+    # Treat as instruction-like (likely NL)
+    return True
+
+
+def should_treat_as_natural_language(text: str) -> bool:
+    """Combine heuristics to decide if input is NL before hitting the shell."""
+    # Quick rejects
+    if not text.strip():
+        return False
+
+    # Strong signals
+    if has_unbalanced_quotes(text):
+        return True
+    if has_unbalanced_parentheses(text):
+        return True
+    if contains_cyrillic(text):
+        return True
+    if looks_like_sentence(text):
+        return True
+    if starts_with_instruction_like_phrase(text):
+        return True
+
+    return False
+
+
+def should_run_interactive(command: str, program: Optional[str] = None) -> bool:
+    """Heuristically decide whether to run command attached to TTY.
+
+    - Known TUI programs (ncdu, top, htop, btop, less, more, vim, nvim, nano, ranger, mc, fzf, watch, man, tmux, screen)
+    - Piped into less/more
+    """
+    prog = (program or command.strip().split()[0]).lower() if command.strip() else ""
+
+    known_tui = {
+        "ncdu",
+        "top",
+        "htop",
+        "btop",
+        "less",
+        "more",
+        "vim",
+        "nvim",
+        "nano",
+        "ranger",
+        "mc",
+        "fzf",
+        "watch",
+        "man",
+        "tmux",
+        "screen",
+    }
+
+    if prog in known_tui:
+        return True
+
+    # If the command contains a pipe into less/more, treat as interactive
+    lowered = command.lower()
+    if "|" in lowered and ("| less" in lowered or "| more" in lowered):
+        return True
+
+    return False
 
 
 def should_show_trace() -> bool:

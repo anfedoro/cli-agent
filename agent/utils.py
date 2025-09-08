@@ -11,7 +11,8 @@ import getpass
 import socket
 import shutil
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import re
 
 
 def get_os_name() -> str:
@@ -45,6 +46,129 @@ def get_subprocess_kwargs() -> Dict[str, Any]:
         # If neither PowerShell is available, use default CMD (no executable specified)
 
     return kwargs
+
+
+def _get_timeout_env_var(name: str) -> Optional[int]:
+    """Helper to parse integer timeout from environment; returns None if unset/invalid/<=0."""
+    val = os.getenv(name)
+    if not val:
+        return None
+    try:
+        num = int(val)
+        return num if num > 0 else None
+    except Exception:
+        return None
+
+
+def get_timeout_seconds(kind: str = "shell") -> Optional[int]:
+    """Get timeout in seconds for command execution.
+
+    Precedence: ENV overrides settings. If nothing is configured, apply
+    sensible defaults to prevent indefinite hangs.
+    - kind: "shell" or "tool"
+    ENV: CLI_AGENT_SHELL_TIMEOUT / CLI_AGENT_TOOL_TIMEOUT
+    Settings: shell_command_timeout_seconds / tool_command_timeout_seconds
+    Defaults: shell=300s (5 min), tool=120s (2 min)
+    """
+    from agent.config import get_setting
+
+    if kind == "tool":
+        env_timeout = _get_timeout_env_var("CLI_AGENT_TOOL_TIMEOUT")
+        if env_timeout is not None:
+            return env_timeout
+        setting = get_setting("tool_command_timeout_seconds", None)
+        # Default to 120s for tools if unset
+        if setting is None:
+            return 120
+    else:
+        env_timeout = _get_timeout_env_var("CLI_AGENT_SHELL_TIMEOUT")
+        if env_timeout is not None:
+            return env_timeout
+        setting = get_setting("shell_command_timeout_seconds", None)
+        # Default to 300s (5 minutes) for shell if unset
+        if setting is None:
+            return 300
+
+    try:
+        if setting is None:
+            return None  # Should not happen due to defaults above
+        val = int(setting)
+        return val if val > 0 else None
+    except Exception:
+        return None
+
+
+def _get_llm_timeout_env_var() -> Optional[int]:
+    """Parse LLM timeout from environment variable CLI_AGENT_LLM_TIMEOUT."""
+    return _get_timeout_env_var("CLI_AGENT_LLM_TIMEOUT")
+
+
+def get_llm_timeout_seconds() -> Optional[int]:
+    """Get HTTP timeout (seconds) for LLM API requests.
+
+    Precedence: ENV overrides settings. Defaults to 120s if unset.
+    - ENV: CLI_AGENT_LLM_TIMEOUT
+    - Settings: llm_request_timeout_seconds
+    - Default: 120 seconds
+    """
+    from agent.config import get_setting
+
+    env_timeout = _get_llm_timeout_env_var()
+    if env_timeout is not None:
+        return env_timeout
+
+    setting = get_setting("llm_request_timeout_seconds", None)
+    if setting is None:
+        return 120
+
+    try:
+        val = int(setting)
+        return val if val > 0 else None
+    except Exception:
+        return 120
+
+
+def should_run_interactive(command: str, program: Optional[str] = None) -> bool:
+    """Heuristically decide whether to run command attached to TTY.
+
+    - Known TUI programs (ncdu, top, htop, btop, less, more, vim, nvim, nano, ranger, mc, fzf, watch, man, tmux, screen)
+    - Piped into less/more
+    - "tail -f" like follow modes
+    """
+    cmd = command.strip()
+    prog = (program or (cmd.split()[0] if cmd else "")).lower()
+
+    known_tui = {
+        "ncdu",
+        "top",
+        "htop",
+        "btop",
+        "less",
+        "more",
+        "vim",
+        "nvim",
+        "nano",
+        "ranger",
+        "mc",
+        "fzf",
+        "watch",
+        "man",
+        "tmux",
+        "screen",
+    }
+
+    if prog in known_tui:
+        return True
+
+    lowered = cmd.lower()
+    if "|" in lowered and ("| less" in lowered or "| more" in lowered):
+        return True
+
+    # Continuous follow pattern
+    if re.search(r"\btail\s+-f\b", lowered):
+        return True
+
+    return False
 
 
 def format_system_context() -> str:

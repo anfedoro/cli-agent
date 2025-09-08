@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from ._shared import prepare_chat_completion_params, extract_unsupported_parameter, is_parameter_error
+from agent.utils import get_llm_timeout_seconds
 
 # Load environment variables
 load_dotenv()
@@ -23,7 +24,8 @@ def initialize_client() -> OpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not found.")
-    return OpenAI(api_key=api_key)
+    timeout = get_llm_timeout_seconds()
+    return OpenAI(api_key=api_key, timeout=timeout)
 
 
 def get_display_name(model_name: str) -> str:
