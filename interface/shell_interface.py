@@ -321,6 +321,10 @@ def should_run_interactive(command: str, program: Optional[str] = None) -> bool:
     if "|" in lowered and ("| less" in lowered or "| more" in lowered):
         return True
 
+    # Privilege escalation typically requires a TTY for password prompt
+    if prog in {"sudo", "su"} or lowered.startswith("sudo "):
+        return True
+
     return False
 
 
