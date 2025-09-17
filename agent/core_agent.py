@@ -223,9 +223,26 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
                 # No captured output; return minimal info
                 return f"Exit code: {result.returncode}\nSTDOUT:\n\nSTDERR:\n"
             else:
+                # Captured mode. For sudo: two-phase flow — interactive 'sudo -v', then 'sudo -n ...' captured
                 if timeout is not None:
                     subprocess_kwargs.update({"timeout": timeout})
-                result = subprocess.run(command, **subprocess_kwargs)
+
+                cmd_str = command.strip()
+                if cmd_str.startswith("sudo "):
+                    # Phase 1: refresh sudo timestamp interactively
+                    interactive_kwargs = get_subprocess_kwargs()
+                    interactive_kwargs.pop("text", None)
+                    interactive_kwargs["capture_output"] = False
+                    interactive_kwargs.pop("timeout", None)
+                    subprocess.run("sudo -v", **interactive_kwargs)
+
+                    # Phase 2: run original with 'sudo -n ...' captured
+                    parts = cmd_str.split(maxsplit=1)
+                    suffix = parts[1] if len(parts) > 1 else ""
+                    cmd_run = f"sudo -n {suffix}".strip()
+                    result = subprocess.run(cmd_run, **subprocess_kwargs)
+                else:
+                    result = subprocess.run(cmd_str, **subprocess_kwargs)
 
             if verbose:
                 stdout_lines = result.stdout.count("\n") if result.stdout else 0

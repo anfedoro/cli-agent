@@ -14,6 +14,7 @@ import subprocess
 import sys
 import re
 from typing import Optional, Tuple
+import getpass
 
 from agent.core_agent import AgentConfig, LLMProvider, process_user_message
 from input_handler.input_handler import enhanced_input, is_readline_available, cleanup_input_handler
@@ -198,11 +199,34 @@ def execute_shell_command(command: str) -> Tuple[int, str, str]:
             result = subprocess.run(raw, **subprocess_kwargs)
             return result.returncode, "", ""
         else:
-            # Captured mode with timeout
+            # Captured mode with timeout. For sudo: first ensure credentials via interactive 'sudo -v',
+            # then run the original command with 'sudo -n' so it won't prompt again, allowing capture.
             timeout = get_timeout_seconds("shell")
             if timeout is not None:
                 subprocess_kwargs.update({"timeout": timeout})
-            result = subprocess.run(raw, **subprocess_kwargs)
+
+            cmd_str = raw.strip()
+            if cmd_str.startswith("sudo "):
+                # Phase 1: refresh sudo timestamp interactively (no capture)
+                interactive_kwargs = get_subprocess_kwargs()
+                interactive_kwargs.pop("text", None)
+                interactive_kwargs["capture_output"] = False
+                interactive_kwargs.pop("timeout", None)
+                subprocess.run("sudo -v", **interactive_kwargs)
+
+                # Phase 2: run the original command with sudo -n (no prompt), captured
+                if cmd_str == "sudo":
+                    cmd_run = "sudo -n"
+                else:
+                    # Insert -n right after 'sudo'
+                    parts = cmd_str.split(maxsplit=1)
+                    suffix = parts[1] if len(parts) > 1 else ""
+                    cmd_run = f"sudo -n {suffix}".strip()
+                result = subprocess.run(cmd_run, **subprocess_kwargs)
+                return result.returncode, result.stdout, result.stderr
+
+            # Regular command path
+            result = subprocess.run(cmd_str, **subprocess_kwargs)
             return result.returncode, result.stdout, result.stderr
 
     except subprocess.TimeoutExpired:
@@ -321,8 +345,9 @@ def should_run_interactive(command: str, program: Optional[str] = None) -> bool:
     if "|" in lowered and ("| less" in lowered or "| more" in lowered):
         return True
 
-    # Privilege escalation typically requires a TTY for password prompt
-    if prog in {"sudo", "su"} or lowered.startswith("sudo "):
+    # 'su' requires a TTY for password prompt (keep interactive);
+    # 'sudo' handled via two-phase (sudo -v interactive, then sudo -n captured)
+    if prog == "su":
         return True
 
     return False
