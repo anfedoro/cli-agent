@@ -186,6 +186,24 @@ def _truncate_output_if_needed(output: str, output_type: str = "STDOUT") -> str:
     return truncated + truncation_msg
 
 
+def _prompt_user_to_continue(max_iterations: int) -> bool:
+    """Ask the user whether to continue after reaching iteration limit."""
+    prompt = f"Reached the iteration limit ({max_iterations}). Do you want to continue? (Y/n) "
+    while True:
+        try:
+            response = input(prompt)
+        except EOFError:
+            return False
+
+        answer = response.strip().lower()
+        if answer in ("", "y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            print("Clarify the task.")
+            return False
+        print("Please respond with 'Y' to continue or 'N' to clarify the task.")
+
+
 def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: bool = False) -> str:
     """Execute a shell command tool and return the result."""
     import subprocess
@@ -313,6 +331,7 @@ def _load_custom_system_prompt_from_env() -> Optional[str]:
     - CLI_AGENT_SYSTEM_PROMPT: inline prompt text
     """
     import os
+
     file_path = os.getenv("CLI_AGENT_SYSTEM_PROMPT_FILE")
     if file_path:
         try:
@@ -347,12 +366,24 @@ def _load_custom_system_prompt_from_settings() -> Optional[str]:
     return None
 
 
+def _format_custom_prompt(raw_prompt: str) -> str:
+    """Format custom prompt, preserving placeholders where applicable."""
+    try:
+        return raw_prompt.format(MAX_AGENT_ITERATIONS=MAX_AGENT_ITERATIONS)
+    except Exception:
+        return raw_prompt
+
+
 def get_system_prompt(shell_mode: bool = False) -> str:
-    """Get system prompt with support for custom overrides via ENV/settings."""
-    # Priority: ENV file > ENV text > settings file > settings text > default
+    """Get system prompt with support for custom extensions via ENV/settings."""
+    base_prompt = SYSTEM_PROMPT.format(MAX_AGENT_ITERATIONS=MAX_AGENT_ITERATIONS)
+
     custom = _load_custom_system_prompt_from_env() or _load_custom_system_prompt_from_settings()
-    base = custom if custom else SYSTEM_PROMPT
-    return base.format(MAX_AGENT_ITERATIONS=MAX_AGENT_ITERATIONS)
+    if custom:
+        custom_formatted = _format_custom_prompt(custom)
+        return f"{base_prompt}\n\nCUSTOM INSTRUCTIONS:\n{custom_formatted.strip()}"
+
+    return base_prompt
 
 
 def process_user_message(
@@ -409,115 +440,116 @@ def process_user_message(
 
     iteration_count = 0
     total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    max_iterations = MAX_AGENT_ITERATIONS
 
-    while iteration_count < MAX_AGENT_ITERATIONS:
-        iteration_count += 1
+    while True:
+        while iteration_count < max_iterations:
+            iteration_count += 1
 
-        if trace_enabled and not silent_mode:
-            print(f"[TRACE] Iteration {iteration_count}/{MAX_AGENT_ITERATIONS}")
-
-        try:
-            # Get current model and available tools for debug
-            current_model = get_model_for_provider(provider)
-            available_tools = GET_AVAILABLE_TOOLS[provider.value]()
-
-            # Debug output when trace is enabled
             if trace_enabled and not silent_mode:
-                print("\n[DEBUG] === REQUEST TO MODEL ===")
-                print(f"[DEBUG] Provider: {provider.value}")
-                print(f"[DEBUG] Model: {current_model}")
-                print(f"[DEBUG] Shell mode: {shell_mode}")
-                print(f"[DEBUG] Messages count: {len(chat_history['messages'])}")
+                print(f"[TRACE] Iteration {iteration_count}/{max_iterations}")
 
-                # Show system message
-                for i, msg in enumerate(chat_history["messages"]):
-                    if msg.get("role") == "system":
-                        print(f"[DEBUG] System message {i + 1}:")
-                        print(f"[DEBUG] Content: {msg['content'][:500]}{'...' if len(msg['content']) > 500 else ''}")
-                    elif msg.get("role") == "user":
-                        print(f"[DEBUG] User message {i + 1}: {msg['content'][:200]}{'...' if len(msg['content']) > 200 else ''}")
-                    elif msg.get("role") == "assistant":
-                        print(f"[DEBUG] Assistant message {i + 1}: {msg['content'][:200]}{'...' if len(msg['content']) > 200 else ''}")
+            try:
+                # Get current model and available tools for debug
+                current_model = get_model_for_provider(provider)
+                available_tools = GET_AVAILABLE_TOOLS[provider.value]()
 
-                # Show available tools
-                print(f"[DEBUG] Available tools: {len(available_tools)}")
-                for tool in available_tools:
-                    if isinstance(tool, dict) and "function" in tool:
-                        print(f"[DEBUG] Tool: {tool['function']['name']} - {tool['function']['description'][:100]}...")
-                print("[DEBUG] === END REQUEST DEBUG ===\n")
+                # Debug output when trace is enabled
+                if trace_enabled and not silent_mode:
+                    print("\n[DEBUG] === REQUEST TO MODEL ===")
+                    print(f"[DEBUG] Provider: {provider.value}")
+                    print(f"[DEBUG] Model: {current_model}")
+                    print(f"[DEBUG] Shell mode: {shell_mode}")
+                    print(f"[DEBUG] Messages count: {len(chat_history['messages'])}")
 
-            # Send message to LLM
-            # Type: ignore needed for compatibility between different providers
-            response_data = SEND_MESSAGE[provider.value](
-                client,
-                chat_history["messages"],
-                current_model,  # type: ignore
-            )
+                    # Show system message
+                    for i, msg in enumerate(chat_history["messages"]):
+                        if msg.get("role") == "system":
+                            print(f"[DEBUG] System message {i + 1}:")
+                            print(f"[DEBUG] Content: {msg['content'][:500]}{'...' if len(msg['content']) > 500 else ''}")
+                        elif msg.get("role") == "user":
+                            print(f"[DEBUG] User message {i + 1}: {msg['content'][:200]}{'...' if len(msg['content']) > 200 else ''}")
+                        elif msg.get("role") == "assistant":
+                            print(f"[DEBUG] Assistant message {i + 1}: {msg['content'][:200]}{'...' if len(msg['content']) > 200 else ''}")
 
-            # Extract usage info if available
-            usage_info = EXTRACT_USAGE_INFO[provider.value](response_data)
-            if usage_info:
-                for key in total_usage:
-                    total_usage[key] += usage_info.get(key, 0)
+                    # Show available tools
+                    print(f"[DEBUG] Available tools: {len(available_tools)}")
+                    for tool in available_tools:
+                        if isinstance(tool, dict) and "function" in tool:
+                            print(f"[DEBUG] Tool: {tool['function']['name']} - {tool['function']['description'][:100]}...")
+                    print("[DEBUG] === END REQUEST DEBUG ===\n")
 
-            # Extract response text
-            response_text = GET_RESPONSE_TEXT[provider.value](response_data)
+                # Send message to LLM
+                response_data = SEND_MESSAGE[provider.value](
+                    client,
+                    chat_history["messages"],
+                    current_model,  # type: ignore
+                )
 
-            # Extract function calls
-            function_calls = EXTRACT_FUNCTION_CALLS[provider.value](response_data)
+                # Extract usage info if available
+                usage_info = EXTRACT_USAGE_INFO[provider.value](response_data)
+                if usage_info:
+                    for key in total_usage:
+                        total_usage[key] += usage_info.get(key, 0)
 
-            if not function_calls:
-                # No function calls - final response
+                # Extract response text
+                response_text = GET_RESPONSE_TEXT[provider.value](response_data)
+
+                # Extract function calls
+                function_calls = EXTRACT_FUNCTION_CALLS[provider.value](response_data)
+
+                if not function_calls:
+                    # No function calls - final response
+                    chat_history["messages"].append({"role": "assistant", "content": response_text})
+
+                    if trace_enabled and not silent_mode:
+                        print(f"[TRACE] Final response (iteration {iteration_count})")
+
+                    if return_usage:
+                        return response_text, total_usage
+                    return response_text
+
+                # Execute function calls
+                if not silent_mode:
+                    print(f"Executing {len(function_calls)} function(s)...")
+
                 chat_history["messages"].append({"role": "assistant", "content": response_text})
 
+                function_results = []
+                for function_call in function_calls:
+                    function_name = function_call["name"]
+                    function_args = function_call["arguments"]
+
+                    command = function_args.get("command", "N/A")
+                    _log_command_execution(command, silent_mode)
+
+                    result = execute_tool(function_name, function_args, verbose)
+                    function_results.append(result)
+
+                ADD_FUNCTION_RESULT_TO_MESSAGES[provider.value](
+                    chat_history["messages"],
+                    response_data,
+                    function_results,  # type: ignore
+                )
+
                 if trace_enabled and not silent_mode:
-                    print(f"[TRACE] Final response (iteration {iteration_count})")
+                    print(f"[TRACE] Executed {len(function_calls)} function(s), continuing...")
+
+            except Exception as e:
+                error_msg = f"Error in iteration {iteration_count}: {str(e)}"
+                if not silent_mode:
+                    print(f"❌ {error_msg}")
 
                 if return_usage:
-                    return response_text, total_usage
-                return response_text
+                    return error_msg, total_usage
+                return error_msg
 
-            # Execute function calls
-            if not silent_mode:
-                print(f"Executing {len(function_calls)} function(s)...")
+        if not silent_mode and _prompt_user_to_continue(max_iterations):
+            max_iterations += MAX_AGENT_ITERATIONS
+            continue
+        break
 
-            chat_history["messages"].append({"role": "assistant", "content": response_text})
-
-            function_results = []
-            for function_call in function_calls:
-                function_name = function_call["name"]
-                function_args = function_call["arguments"]
-
-                command = function_args.get("command", "N/A")
-                _log_command_execution(command, silent_mode)
-
-                result = execute_tool(function_name, function_args, verbose)
-                function_results.append(result)
-
-            # Add function results to messages (passing the list, not individual results)
-            ADD_FUNCTION_RESULT_TO_MESSAGES[provider.value](
-                chat_history["messages"],
-                response_data,
-                function_results,  # type: ignore
-            )
-
-            if trace_enabled and not silent_mode:
-                print(f"[TRACE] Executed {len(function_calls)} function(s), continuing...")
-
-        except Exception as e:
-            error_msg = f"Error in iteration {iteration_count}: {str(e)}"
-            if not silent_mode:
-                print(f"❌ {error_msg}")
-
-            if return_usage:
-                return error_msg, total_usage
-            return error_msg
-
-    # Max iterations reached
-    final_response = (
-        f"Достигнуто максимальное число итераций ({MAX_AGENT_ITERATIONS}). "
-        "Продолжить выполнение? Ответьте 'продолжить' для продолжения или уточните задачу."
-    )
+    final_response = f"Reached the iteration limit ({max_iterations}). Do you want to continue? (Y/n)"
     if not silent_mode:
         print(f"⚠️  {final_response}")
 
