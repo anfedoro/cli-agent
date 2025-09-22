@@ -8,6 +8,7 @@ Core LLM Agent - чистая логика обработки запросов �
 from enum import Enum
 from typing import Any, Dict, List, Tuple, Union, Optional
 import json
+import shutil
 
 from dotenv import load_dotenv
 
@@ -28,7 +29,7 @@ load_dotenv()
 
 
 def get_agent_tools() -> List[Dict[str, Any]]:
-    """Централизованное определение всех доступных инструментов для агента."""
+    """Centralized definition of all available tools for the agent."""
     return [
         {
             "type": "function",
@@ -51,6 +52,35 @@ def get_agent_tools() -> List[Dict[str, Any]]:
                         },
                     },
                     "required": ["command"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_python_code",
+                "description": "Execute Python code using the local interpreter and return stdout/stderr",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "Python code snippet to execute",
+                        },
+                        "estimated_timeout": {
+                            "type": "integer",
+                            "description": "Estimated timeout in seconds (5-300). Simple scripts use 5-30s; heavy tasks may need more",
+                            "minimum": 5,
+                            "maximum": 300,
+                            "default": 30,
+                        },
+                        "python_path": {
+                            "type": "string",
+                            "description": "Optional explicit path to Python executable (defaults to python3/python on PATH)",
+                        },
+                    },
+                    "required": ["code"],
+                    "additionalProperties": False,
                 },
             },
         },
@@ -277,6 +307,48 @@ def execute_tool(function_name: str, function_args: Dict[str, Any], verbose: boo
             return f"Error: Command timed out after {timeout} seconds"
         except Exception as e:
             return f"Error executing command: {str(e)}"
+
+    elif function_name == "run_python_code":
+        code = function_args.get("code")
+        if not code or not isinstance(code, str):
+            return "Error: Python code not specified"
+
+        python_path = function_args.get("python_path")
+        if python_path and not python_path.strip():
+            python_path = None
+
+        python_exec = python_path or shutil.which("python3") or shutil.which("python")
+        if not python_exec:
+            return "Error: Python interpreter not found on PATH"
+
+        estimated_timeout = function_args.get("estimated_timeout")
+        configured_timeout = get_timeout_seconds("tool")
+        if configured_timeout is None:
+            timeout = None
+        else:
+            if isinstance(estimated_timeout, int):
+                timeout = min(max(5, estimated_timeout), configured_timeout)
+            else:
+                timeout = configured_timeout
+
+        try:
+            result = subprocess.run(
+                [python_exec, "-u", "-c", code],
+                capture_output=True,
+                text=True,
+                timeout=timeout if timeout is not None else None,
+            )
+        except subprocess.TimeoutExpired:
+            return f"Error: Python code timed out after {timeout} seconds"
+        except FileNotFoundError:
+            return f"Error: Python interpreter '{python_exec}' not found"
+        except Exception as exc:
+            return f"Error executing Python code: {exc}"
+
+        stdout_output = _truncate_output_if_needed(result.stdout) if result.stdout else ""
+        stderr_output = _truncate_output_if_needed(result.stderr, "STDERR") if result.stderr else ""
+
+        return f"Exit code: {result.returncode}\nSTDOUT:\n{stdout_output}\nSTDERR:\n{stderr_output}"
 
     elif function_name == "get_agent_configuration":
         from agent.config import load_settings
