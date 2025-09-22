@@ -77,6 +77,8 @@ def get_agent_tools() -> List[Dict[str, Any]]:
                         "preserve_initial_location": {"type": "boolean", "description": "Whether to return to starting directory when exiting shell mode"},
                         "completion_enabled": {"type": "boolean", "description": "Whether to enable tab completion in shell mode"},
                         "history_length": {"type": "integer", "minimum": 1, "description": "Number of commands to keep in history"},
+                        "system_prompt_file": {"type": ["string", "null"], "description": "Path to a file with custom system prompt (Markdown/text)"},
+                        "system_prompt_text": {"type": ["string", "null"], "description": "Inline custom system prompt text"},
                     },
                     "additionalProperties": False,
                 },
@@ -303,9 +305,54 @@ def trim_history_if_needed(messages: List[Dict[str, Any]]) -> List[Dict[str, Any
     return messages
 
 
+def _load_custom_system_prompt_from_env() -> Optional[str]:
+    """Load custom system prompt from environment variables if provided.
+
+    Supports:
+    - CLI_AGENT_SYSTEM_PROMPT_FILE: path to a file with prompt content
+    - CLI_AGENT_SYSTEM_PROMPT: inline prompt text
+    """
+    import os
+    file_path = os.getenv("CLI_AGENT_SYSTEM_PROMPT_FILE")
+    if file_path:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            pass
+    text = os.getenv("CLI_AGENT_SYSTEM_PROMPT")
+    if text and text.strip():
+        return text
+    return None
+
+
+def _load_custom_system_prompt_from_settings() -> Optional[str]:
+    """Load custom system prompt from persistent settings if present."""
+    try:
+        from agent.config import get_setting
+
+        file_path = get_setting("system_prompt_file", None)
+        if isinstance(file_path, str) and file_path.strip():
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+
+        text = get_setting("system_prompt_text", None)
+        if isinstance(text, str) and text.strip():
+            return text
+    except Exception:
+        pass
+    return None
+
+
 def get_system_prompt(shell_mode: bool = False) -> str:
-    """Get system prompt - currently unified for both chat and shell modes."""
-    return SYSTEM_PROMPT.format(MAX_AGENT_ITERATIONS=MAX_AGENT_ITERATIONS)
+    """Get system prompt with support for custom overrides via ENV/settings."""
+    # Priority: ENV file > ENV text > settings file > settings text > default
+    custom = _load_custom_system_prompt_from_env() or _load_custom_system_prompt_from_settings()
+    base = custom if custom else SYSTEM_PROMPT
+    return base.format(MAX_AGENT_ITERATIONS=MAX_AGENT_ITERATIONS)
 
 
 def process_user_message(
@@ -467,9 +514,15 @@ def process_user_message(
             return error_msg
 
     # Max iterations reached
-    final_response = f"Reached maximum iterations ({MAX_AGENT_ITERATIONS}). Unable to complete the task."
+    final_response = (
+        f"Достигнуто максимальное число итераций ({MAX_AGENT_ITERATIONS}). "
+        "Продолжить выполнение? Ответьте 'продолжить' для продолжения или уточните задачу."
+    )
     if not silent_mode:
         print(f"⚠️  {final_response}")
+
+    if "messages" in chat_history:
+        chat_history["messages"].append({"role": "assistant", "content": final_response})
 
     if return_usage:
         return final_response, total_usage

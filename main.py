@@ -22,8 +22,14 @@ def main():
     parser.add_argument("--no-reasoning", action="store_true", help="Disable reasoning process for faster responses (LM Studio)")
     parser.add_argument("--mode", choices=["chat", "shell"], default=default_mode, help=f"Run mode: chat (conversation) or shell (command mode) (default: {default_mode})")
     parser.add_argument("--trace", "-t", action="store_true", help="Enable trace mode (show LLM execution details, only in shell mode)")
+    parser.add_argument("--system-prompt-file", help="Path to a Markdown/text file with custom system prompt (session-scoped override)")
     parser.add_argument("--no-restore", action="store_true", help="Don't restore initial directory on exit (shell mode only)")
     args = parser.parse_args()
+
+    # Apply session-scoped system prompt override via environment
+    if args.system_prompt_file:
+        import os
+        os.environ["CLI_AGENT_SYSTEM_PROMPT_FILE"] = args.system_prompt_file
 
     if args.mode == "shell":
         # Shell mode: standard shell prompt with intelligent routing

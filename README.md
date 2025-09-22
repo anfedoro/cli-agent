@@ -181,7 +181,7 @@ The agent includes a powerful configuration system that can be updated through n
 Settings are stored in `~/.cliagent/settings.json` and can be edited directly:
 ```json
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "default_provider": "openai",
   "default_model": null,
   "default_mode": "shell",

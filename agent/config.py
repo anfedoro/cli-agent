@@ -74,7 +74,7 @@ def initialize_config() -> None:
         import json
 
         default_settings = {
-            "version": "0.3.0",
+            "version": "0.3.1",
             "default_provider": "openai",
             "default_model": None,  # Model to use by default (provider-specific)
             "default_mode": "chat",  # Default mode: "chat" or "shell"
@@ -82,6 +82,9 @@ def initialize_config() -> None:
             "completion_enabled": True,
             "preserve_initial_location": True,  # Return to starting directory on exit
             "agent_prompt_indicator": "⭐",  # Symbol to show in prompt when in agent mode
+            # System prompt overrides (optional)
+            "system_prompt_file": None,  # Path to a file with custom system prompt
+            "system_prompt_text": None,  # Inline custom system prompt text
             "created_at": str(config_dir.stat().st_ctime) if config_dir.exists() else None,
         }
 
@@ -114,7 +117,7 @@ def load_settings() -> dict:
 
     # Return default settings if file doesn't exist or is corrupted
     return {
-        "version": "0.3.0",
+        "version": "0.3.1",
         "default_provider": "openai",
         "default_model": None,
         "default_mode": "chat",
@@ -122,6 +125,8 @@ def load_settings() -> dict:
         "completion_enabled": True,
         "preserve_initial_location": True,
         "agent_prompt_indicator": "⭐",
+        "system_prompt_file": None,
+        "system_prompt_text": None,
         "created_at": None,
     }
 
@@ -174,6 +179,9 @@ def update_configuration(updates: dict) -> dict:
             "reasoning_effort",
             "reasoning_verbosity",
             "reasoning_model_patterns",  # mapping provider -> list of patterns
+            # system prompt overrides
+            "system_prompt_file",
+            "system_prompt_text",
         }
 
         valid_providers = {"openai", "gemini", "lmstudio"}
@@ -236,6 +244,18 @@ def update_configuration(updates: dict) -> dict:
                             break
                     if not ok:
                         continue
+            elif key == "system_prompt_file":
+                # Accept None or string path
+                if value is None:
+                    pass
+                elif not isinstance(value, str) or not value.strip():
+                    continue
+            elif key == "system_prompt_text":
+                # Accept None or non-empty string
+                if value is None:
+                    pass
+                elif not isinstance(value, str) or not value.strip():
+                    continue
 
             updated_settings[key] = value
             applied_updates[key] = value
