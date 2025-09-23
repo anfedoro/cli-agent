@@ -62,7 +62,7 @@ def get_agent_tools() -> List[Dict[str, Any]]:
                 "description": "Execute Python code using the local interpreter and return stdout/stderr",
                 "parameters": {
                     "type": "object",
-                    "properties": {make
+                    "properties": {
                         "code": {
                             "type": "string",
                             "description": "Python code snippet to execute",
