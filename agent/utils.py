@@ -288,7 +288,7 @@ def get_shell_prompt(agent_mode=False):
     # Add agent indicator if agent mode is enabled
     indicator = ""
     if agent_mode:
-        agent_indicator = get_setting("agent_prompt_indicator", "⭐")
+        agent_indicator = get_setting("agent_prompt_indicator", "▶︎")
         if agent_indicator:
             indicator = agent_indicator + " "
 
