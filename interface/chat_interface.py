@@ -1,8 +1,8 @@
 """
-Chat Frontend - интерактивный чат интерфейс.
+Chat Frontend — interactive chat interface.
 
-Этот модуль предоставляет UI для общения с агентом в режиме чата.
-Использует core_agent как бэкенд для обработки сообщений.
+This module provides a UI for chatting with the agent in chat mode.
+It uses core_agent as a backend for processing messages.
 """
 
 from typing import Optional

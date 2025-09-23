@@ -1,8 +1,8 @@
 """
-Core LLM Agent - чистая логика обработки запросов с функциями.
+Core LLM Agent — pure function-calling request processing logic.
 
-Этот модуль содержит только агентскую логику обработки запросов с функциями.
-Используется как бэкенд для chat и shell интерфейсов.
+This module contains only the agent's logic for handling requests with tools.
+It is used as a backend for both chat and shell interfaces.
 """
 
 from enum import Enum
@@ -62,7 +62,7 @@ def get_agent_tools() -> List[Dict[str, Any]]:
                 "description": "Execute Python code using the local interpreter and return stdout/stderr",
                 "parameters": {
                     "type": "object",
-                    "properties": {
+                    "properties": {make
                         "code": {
                             "type": "string",
                             "description": "Python code snippet to execute",

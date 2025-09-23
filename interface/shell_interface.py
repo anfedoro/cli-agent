@@ -254,7 +254,7 @@ def has_unbalanced_parentheses(text: str) -> bool:
 
 
 def contains_cyrillic(text: str) -> bool:
-    """Detect Cyrillic characters (common in Russian natural language prompts)."""
+    """Detect Cyrillic characters (common for Slavic language prompts)."""
     return re.search(r"[А-Яа-яЁё]", text) is not None
 
 

@@ -262,13 +262,13 @@ def format_system_context() -> str:
 
 def get_shell_prompt(agent_mode=False):
     """
-    Генерирует приглашение командной строки для shell режима.
+    Generate a shell prompt string for the interactive shell mode.
 
     Args:
-        agent_mode (bool): True для отображения индикатора агента в приглашении
+        agent_mode (bool): True to show agent indicator in the prompt
 
     Returns:
-        str: Строка приглашения командной строки
+        str: Prompt string for the shell
     """
     from agent.config import get_setting
 
@@ -276,7 +276,7 @@ def get_shell_prompt(agent_mode=False):
     hostname = socket.gethostname().split(".")[0]
     current_dir = Path.cwd()
 
-    # Сокращаем путь если он в домашней директории
+    # Shorten path when inside the home directory
     home = Path.home()
     if current_dir == home:
         path = "~"
@@ -285,7 +285,7 @@ def get_shell_prompt(agent_mode=False):
     else:
         path = str(current_dir)
 
-    # Добавляем индикатор агента если включен режим агента
+    # Add agent indicator if agent mode is enabled
     indicator = ""
     if agent_mode:
         agent_indicator = get_setting("agent_prompt_indicator", "⭐")
