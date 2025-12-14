@@ -202,7 +202,13 @@ def _load_raw_config(path: Path) -> Dict[str, Any]:
 def load_app_config(path: Optional[Path]) -> AppConfig:
     raw_config = _load_raw_config(path) if path else {}
 
-    provider_data = raw_config.get("provider", {})
+    provider_data = raw_config.get("provider")
+    if not provider_data:
+        # Legacy configs might place provider keys at the root.
+        fallback_keys = ("name", "base_url", "api_key_env", "model", "model_params")
+        provider_data = {k: raw_config.get(k) for k in fallback_keys if k in raw_config}
+    if provider_data is None:
+        provider_data = {}
     provider = ProviderConfig(
         name=provider_data.get("name", "openai"),
         base_url=provider_data.get("base_url"),

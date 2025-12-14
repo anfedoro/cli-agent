@@ -75,6 +75,27 @@ show_tool_args = false
     assert config.prompt.custom_prompt_mode == "system"
 
 
+def test_load_app_config_accepts_flat_provider_keys(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+name = "alt"
+base_url = "http://example.com"
+api_key_env = "OTHER"
+model = "gpt-test"
+model_params = {temperature = 0.2}
+        """,
+        encoding="utf-8",
+    )
+
+    config = load_app_config(config_path)
+    assert config.provider.name == "alt"
+    assert config.provider.base_url == "http://example.com"
+    assert config.provider.api_key_env == "OTHER"
+    assert config.provider.model == "gpt-test"
+    assert config.provider.model_params == {"temperature": 0.2}
+
+
 def test_load_app_config_rejects_invalid_custom_prompt_mode(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(
