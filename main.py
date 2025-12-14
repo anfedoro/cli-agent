@@ -70,7 +70,7 @@ def load_config(args: argparse.Namespace) -> AppConfig:
 
 def handle_reset(history: HistoryStore) -> int:
     history.reset()
-    print("✅ reset", file=sys.stderr)
+    print("✅@ reset", file=sys.stderr)
     return 0
 
 
@@ -85,6 +85,10 @@ def main() -> int:
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
         return 1
+
+    if getattr(config, "provider", None):
+        cfg_path = config.path or Path("(memory)")
+        print(f"Using config {cfg_path} (model: {config.provider.model})", file=sys.stderr)
 
     plugin_path, plugin_changed = ensure_zsh_plugin(config.path or Path("~/.config/cli-agent/config.toml"))
     if plugin_changed:
