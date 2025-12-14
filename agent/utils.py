@@ -23,6 +23,10 @@ def _load_plugin_content() -> str:
         return """# Minimal zsh integration for cli-agent
 
 if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]] && whence -w _cli_agent_accept_line >/dev/null 2>&1; then
+  # Ensure widgets stay bound even if re-sourced.
+  zle -N accept-line _cli_agent_accept_line
+  zle -N up-line-or-history _cli_agent_history_up
+  zle -N down-line-or-history _cli_agent_history_down
   return
 fi
 CLI_AGENT_PLUGIN_LOADED=1
@@ -103,10 +107,16 @@ _cli_agent_history_down() {
   fi
 }
 
-# Preserve original widgets
-zle -A accept-line cli-agent-orig-accept-line
-zle -A up-line-or-history cli-agent-orig-up-line-or-history
-zle -A down-line-or-history cli-agent-orig-down-line-or-history
+# Preserve original widgets (only if not already captured)
+if ! whence -w cli-agent-orig-accept-line >/dev/null 2>&1; then
+  zle -A accept-line cli-agent-orig-accept-line
+fi
+if ! whence -w cli-agent-orig-up-line-or-history >/dev/null 2>&1; then
+  zle -A up-line-or-history cli-agent-orig-up-line-or-history
+fi
+if ! whence -w cli-agent-orig-down-line-or-history >/dev/null 2>&1; then
+  zle -A down-line-or-history cli-agent-orig-down-line-or-history
+fi
 
 # Override with cli-agent aware widgets
 zle -N accept-line _cli_agent_accept_line
