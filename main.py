@@ -19,6 +19,7 @@ from agent.history import HistoryStore
 from agent.loop import run_agent
 from agent.ui import build_console
 from agent.utils import ensure_zsh_plugin, is_reset_command
+from agent.tools import set_active_config_path
 
 APP_VERSION = "0.4.2"
 
@@ -117,6 +118,7 @@ def main() -> int:
     _install_status_signals(config)
 
     history = HistoryStore(config.agent.history_dir, args.session or config.agent.session)
+    set_active_config_path(config.path)
 
     request_text = args.request or args.input
     if args.reset or is_reset_command(request_text):
