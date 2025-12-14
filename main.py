@@ -86,10 +86,6 @@ def main() -> int:
         print(f"Config error: {exc}", file=sys.stderr)
         return 1
 
-    if getattr(config, "provider", None):
-        cfg_path = config.path or Path("(memory)")
-        print(f"Using config {cfg_path} (model: {config.provider.model})", file=sys.stderr)
-
     plugin_path, plugin_changed = ensure_zsh_plugin(config.path or Path("~/.config/cli-agent/config.toml"))
     if plugin_changed:
         print(
