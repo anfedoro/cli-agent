@@ -20,7 +20,7 @@ def _load_plugin_content() -> str:
         return source.read_text(encoding="utf-8")
     except OSError:
         # Fallback copy if the file is not present in the installed wheel.
-        return r"""# Minimal zsh integration for cli-agent
+        return """# Minimal zsh integration for cli-agent
 
 if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]]; then
   return
@@ -40,7 +40,7 @@ _cli_agent_refresh_history() {
     _cli_agent_nl_history=("${(f)$(<${_cli_agent_history_file})}")
   else
     _cli_agent_nl_history=()
-  }
+  fi
   _cli_agent_nl_index=$((${#_cli_agent_nl_history[@]} + 1))
 }
 
@@ -51,9 +51,9 @@ _cli_agent_run_payload() {
   local output
   output=$(cli-agent --session "${CLI_AGENT_SESSION}" "${payload}")
   while IFS= read -r line; do
-    if [[ "$line" == ADD\ * ]]; then
+    if [[ "$line" == ADD\\ * ]]; then
       eval "${line#ADD }"
-    }
+    fi
   done <<< "${output}"
   _cli_agent_refresh_history
 }
