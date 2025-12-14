@@ -66,7 +66,7 @@ show_step_summary = true
 The CLI writes `plugin.zsh` and `plugin.bash` next to your active config (default `~/.config/cli-agent/`) and prints a reminder when it creates/updates them. Source the one that matches your shell to enable the `@` prefix and nl-history navigation.
 - Common: Enter runs `cli-agent "<payload>"`; stdout `ADD ...` lines are executed; stderr shows the Rich UI.
 - zsh: `source ~/.config/cli-agent/plugin.zsh`; Up/Down arrows cycle through `nl_history.txt` when the prefix is present.
-- bash: `source ~/.config/cli-agent/plugin.bash`; Up/Down arrows walk `nl_history.txt` for prefixed input while regular shell history keeps working otherwise.
+- bash: `source ~/.config/cli-agent/plugin.bash`; Up/Down arrows walk `nl_history.txt` for prefixed input while regular shell history keeps working otherwise; the plugin hooks `command_not_found_handle` to reroute `@...` commands (existing handlers are preserved).
 
 ## Development
 - Tests: `uv run pytest` (smoke tests mock the LLM client; no network needed).
