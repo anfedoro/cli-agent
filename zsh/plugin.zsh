@@ -44,6 +44,7 @@ _cli_agent_accept_line() {
     BUFFER=""
     zle redisplay
     _cli_agent_run_payload "${payload}"
+    zle redisplay
   else
     zle cli-agent-orig-accept-line
   fi
