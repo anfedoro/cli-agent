@@ -38,7 +38,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--reset", action="store_true", help="Reset stored history for the session")
     parser.add_argument("--config", help="Path to config TOML file")
     parser.add_argument("--session", help="Session name (overrides config)")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
+    parser.add_argument("--version", action="store_true", help="Show version and exit")
     args = parser.parse_args(argv)
     if args.request and args.input:
         parser.error("Provide request as a positional argument or via --input, not both.")
@@ -88,7 +88,14 @@ def main() -> int:
 
     plugin_path, plugin_changed = ensure_zsh_plugin(config.path or Path("~/.config/cli-agent/config.toml"))
     if plugin_changed:
-        print(f"Installed zsh plugin at {plugin_path}. Add 'source {plugin_path}' to your ~/.zshrc to enable the @ prefix.", file=sys.stderr)
+        print(
+            f"Installed zsh plugin at {plugin_path}. Add 'source {plugin_path}' to your ~/.zshrc to enable the @ prefix.",
+            file=sys.stderr,
+        )
+
+    if args.version:
+        print(f"cli-agent {APP_VERSION}")
+        return 0
 
     history = HistoryStore(config.agent.history_dir, args.session or config.agent.session)
 
