@@ -4,15 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cli-agent"
-version = "0.3.1"
-description = "CLI Agent supporting multiple LLM providers"
+version = "0.4.2"
+description = "Async CLI backend agent with tool-calling loop"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "google-generativeai>=0.3.0",
     "openai>=1.0.0",
-    "python-dotenv>=1.0.0",
-    "pyreadline3; sys_platform == 'win32'",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
@@ -28,4 +26,4 @@ cli-agent = "main:main"
 py-modules = ["main"]
 
 [tool.setuptools.packages.find]
-include = ["providers", "agent", "interface", "input_handler"]
+include = ["agent"]

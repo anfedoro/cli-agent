@@ -9,6 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
-# Tests (keep local only)
-tests/
+
 **/*.DS_Store**
+AGENTS.md

@@ -1,288 +1,245 @@
-"""
-CLI Agent Configuration Management
+from __future__ import annotations
 
-Handles creation and management of configuration directory for storing
-agent settings, chat history, and other persistent data.
-Cross-platform unified approach using ~/.cliagent on all platforms.
-"""
-
-import json
+import os
+import tomllib
+from dataclasses import dataclass, field
 from pathlib import Path
+from textwrap import dedent
+from typing import Any, Dict, Optional
 
 
-def get_config_dir() -> Path:
-    """Get the configuration directory path based on OS.
+class ConfigError(Exception):
+    """Raised when configuration cannot be loaded or parsed."""
 
-    - Unix/macOS: ~/.cliagent
-    - Windows: ~/.cliagent (unified approach for simplicity)
 
-    Returns:
-        Path to configuration directory
+@dataclass
+class ProviderConfig:
+    name: str = "openai"
+    base_url: Optional[str] = None
+    api_key_env: str = "OPENAI_API_KEY"
+    model: str = "gpt-4.1-mini"
+    model_params: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class AgentConfig:
+    max_steps: int = 20
+    timeout_sec: int = 90
+    max_tool_calls_per_step: int = 10
+    history_dir: Path = Path("~/.local/share/cli-agent")
+    session: str = "default"
+
+
+DEFAULT_SYSTEM_PROMPT = dedent(
     """
-    home = Path.home()
+    # Terminal Agent — Cross-Platform
 
-    # Use unified approach: ~/.cliagent on all platforms
-    # This simplifies cross-platform development and user experience
-    return home / ".cliagent"
+    Role: You are a terminal agent with cross-platform CLI access (Windows PowerShell/CMD; Linux/Unix shells).
 
+    SECURITY
+    - NEVER install software without explicit user permission.
+    - Check tool availability first: run with --version or --help.
+    - Prefer PowerShell on Windows; POSIX shells on Unix.
+    - If a required tool is missing: say which tool and ask:
+      "To proceed, I need to install [tool]. May I do so?"
 
-def ensure_config_dir() -> Path:
-    """Ensure the configuration directory exists.
+    EXECUTION STRATEGY
+    1. Identify necessary commands for the request.
+    2. Verify tools (see SECURITY).
+    3. If install needed — request permission; only proceed after confirmation.
+    4. Execute commands once tools are confirmed.
+    5. Analyze results:
+       - If success -> provide result without extra calls.
+       - If fail/unclear -> adjust and retry (max {MAX_AGENT_ITERATIONS}).
+       - If still no solution -> explain the issue and offer alternatives.
+    6. Run multiple commands sequentially if required, but be strategic.
 
-    Creates ~/.cliagent directory if it doesn't exist.
+    COMMAND ERROR HANDLING
+    - For "command not found": propose correct spelling, alternatives, or installation.
+    - For permission/syntax errors: give specific fixes.
+    - Distinguish typos vs. natural-language questions.
+    - If user shares a failed command, focus on that failure.
 
-    Returns:
-        Path to the configuration directory
+    SHELL MODE BEHAVIOR
+    - Be concise and task-focused; no fluff.
+    - Present successful command outputs cleanly.
+
+    COMPLETION RULES
+    - ALWAYS show command outputs verbatim in fenced code blocks, unmodified.
+    - Show ALL output lines; do not summarize or truncate. If output is very long (>100 lines), still show it all, then suggest filters.
+    - After the complete output, you may add brief commentary.
+    - After 2-3 unsuccessful attempts, explain clearly and propose alternatives.
+    - Respond concisely in the user's prompt language.
+    - Preserve original output formatting.
+    - Visually separate raw output (code, outcome, explanations, recommendations etc.) via clear labels.
     """
-    config_dir = get_config_dir()
-    config_dir.mkdir(exist_ok=True)
-    return config_dir
+).strip()
 
 
-def get_history_file() -> Path:
-    """Get the history file path.
+@dataclass
+class PromptConfig:
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    custom_prompt: str = ""
+    custom_prompt_mode: str = "developer"  # developer or system
 
-    Returns:
-        Path to history.txt in configuration directory
-        (All platforms: ~/.cliagent/history.txt)
+
+@dataclass
+class UIConfig:
+    rich: bool = True
+    show_tool_args: bool = True
+    show_step_summary: bool = True
+
+
+@dataclass
+class AppConfig:
+    provider: ProviderConfig
+    agent: AgentConfig
+    ui: UIConfig
+    prompt: PromptConfig = field(default_factory=PromptConfig)
+    tools: Dict[str, Any] = field(default_factory=dict)
+    path: Optional[Path] = None
+
+
+DEFAULT_CONFIG_PATHS = [
+    "~/.config/cli-agent/config.toml",
+    "./config.toml",
+]
+
+
+def _build_default_config_template() -> str:
+    return f"""# Default cli-agent configuration
+[provider]
+name = "openai"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-4.1-mini"
+base_url = ""
+[provider.model_params]
+# temperature = 0.0
+# top_p = 1.0
+# max_output_tokens = 1024
+# reasoning_effort = "medium"  # e.g., for reasoning-capable models
+
+[agent]
+max_steps = 20
+timeout_sec = 90
+max_tool_calls_per_step = 10
+history_dir = "~/.local/share/cli-agent"
+session = "default"
+
+[prompt]
+# Leave blank to use the built-in secure system prompt. Override at your own risk.
+system_prompt = ""
+custom_prompt = ""
+custom_prompt_mode = "developer"
+
+[ui]
+rich = true
+show_tool_args = true
+show_step_summary = true
+"""
+
+
+DEFAULT_CONFIG_TEMPLATE = _build_default_config_template()
+
+
+def _expand_path(path_value: str | Path) -> Path:
+    return Path(path_value).expanduser().resolve()
+
+
+def find_config_path(cli_argument: Optional[str] = None) -> Optional[Path]:
+    """Return the first existing config path using the required priority."""
+    candidates = []
+    if cli_argument:
+        candidates.append(Path(cli_argument))
+    env_path = os.getenv("CLI_AGENT_CONFIG")
+    if env_path:
+        candidates.append(Path(env_path))
+    candidates.extend(Path(p) for p in DEFAULT_CONFIG_PATHS)
+
+    for candidate in candidates:
+        expanded = _expand_path(candidate)
+        if expanded.is_file():
+            return expanded
+    return None
+
+
+def initialize_default_config(env_config_path: Optional[str] = None) -> Path:
     """
-    return ensure_config_dir() / "history.txt"
+    Write a default config to the first writable location and return its path.
 
-
-def get_settings_file() -> Path:
-    """Get the settings file path.
-
-    Returns:
-        Path to settings.json in configuration directory
-        (All platforms: ~/.cliagent/settings.json)
+    The search order respects CLI_AGENT_CONFIG when provided, then DEFAULT_CONFIG_PATHS.
     """
-    return ensure_config_dir() / "settings.json"
+    candidates: list[Path] = []
+    if env_config_path:
+        candidates.append(Path(env_config_path))
+    candidates.extend(Path(p) for p in DEFAULT_CONFIG_PATHS)
 
-
-def initialize_config() -> None:
-    """Initialize configuration directory and files if they don't exist."""
-    config_dir = ensure_config_dir()
-
-    # Create history file if it doesn't exist
-    history_file = get_history_file()
-    if not history_file.exists():
-        history_file.touch()
-
-    # Create basic settings file if it doesn't exist
-    settings_file = get_settings_file()
-    if not settings_file.exists():
-        import json
-
-        default_settings = {
-            "version": "0.3.1",
-            "default_provider": "openai",
-            "default_model": None,  # Model to use by default (provider-specific)
-            "default_mode": "chat",  # Default mode: "chat" or "shell"
-            "history_length": 1000,
-            "completion_enabled": True,
-            "preserve_initial_location": True,  # Return to starting directory on exit
-            "agent_prompt_indicator": "⭐",  # Symbol to show in prompt when in agent mode
-            # System prompt overrides (optional)
-            "system_prompt_file": None,  # Path to a file with custom system prompt
-            "system_prompt_text": None,  # Inline custom system prompt text
-            "created_at": str(config_dir.stat().st_ctime) if config_dir.exists() else None,
-        }
-
-        with open(settings_file, "w") as f:
-            json.dump(default_settings, f, indent=2)
-
-
-def cleanup_config() -> None:
-    """Cleanup function for configuration."""
-    # Currently no cleanup needed, but could be used for
-    # cleaning temporary files, closing connections, etc.
-    pass
-
-
-def load_settings() -> dict:
-    """Load settings from config file.
-
-    Returns:
-        Dictionary with settings, or default settings if file doesn't exist
-    """
-    settings_file = get_settings_file()
-    if settings_file.exists():
+    errors: list[str] = []
+    for candidate in candidates:
+        target = _expand_path(candidate)
         try:
-            import json
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists():
+                target.write_text(DEFAULT_CONFIG_TEMPLATE, encoding="utf-8")
+            return target
+        except OSError as exc:
+            errors.append(f"{target}: {exc}")
 
-            with open(settings_file, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            pass
-
-    # Return default settings if file doesn't exist or is corrupted
-    return {
-        "version": "0.3.1",
-        "default_provider": "openai",
-        "default_model": None,
-        "default_mode": "chat",
-        "history_length": 1000,
-        "completion_enabled": True,
-        "preserve_initial_location": True,
-        "agent_prompt_indicator": "⭐",
-        "system_prompt_file": None,
-        "system_prompt_text": None,
-        "created_at": None,
-    }
+    detail = "; ".join(errors) if errors else "no candidate paths"
+    raise ConfigError(f"Unable to create default config ({detail}).")
 
 
-def save_settings(settings: dict) -> None:
-    """Save settings to config file.
-
-    Args:
-        settings: Dictionary with settings to save
-    """
-    settings_file = get_settings_file()
+def _load_raw_config(path: Path) -> Dict[str, Any]:
     try:
-        import json
-
-        with open(settings_file, "w") as f:
-            json.dump(settings, f, indent=2)
-    except Exception as e:
-        print(f"Error saving settings: {e}")
-
-
-def update_configuration(updates: dict) -> dict:
-    """Update configuration settings.
-
-    Args:
-        updates: Dictionary with configuration updates.
-                Supported keys: default_provider, default_model, default_mode,
-                agent_prompt_indicator, preserve_initial_location, completion_enabled
-
-    Returns:
-        Dictionary with result status and updated settings
-    """
-    try:
-        # Load current settings
-        current_settings = load_settings()
-
-        # Validate and apply updates
-        valid_keys = {
-            "default_provider",
-            "default_model",
-            "default_mode",
-            "agent_prompt_indicator",
-            "preserve_initial_location",
-            "completion_enabled",
-            "history_length",
-            # execution controls
-            "shell_command_timeout_seconds",
-            "tool_command_timeout_seconds",
-            # generation controls
-            "temperature",
-            "reasoning_effort",
-            "reasoning_verbosity",
-            "reasoning_model_patterns",  # mapping provider -> list of patterns
-            # system prompt overrides
-            "system_prompt_file",
-            "system_prompt_text",
-        }
-
-        valid_providers = {"openai", "gemini", "lmstudio"}
-        valid_modes = {"chat", "shell"}
-
-        updated_settings = current_settings.copy()
-        applied_updates = {}
-
-        for key, value in updates.items():
-            if key not in valid_keys:
-                continue
-
-            # Validate specific settings
-            if key == "default_provider" and value not in valid_providers:
-                continue
-            elif key == "default_mode" and value not in valid_modes:
-                continue
-            elif key in ["preserve_initial_location", "completion_enabled"] and not isinstance(value, bool):
-                continue
-            elif key == "history_length" and (not isinstance(value, int) or value < 1):
-                continue
-            elif key in ["shell_command_timeout_seconds", "tool_command_timeout_seconds"]:
-                # Accept int > 0, or 0/None to disable
-                if value is None:
-                    pass
-                elif not isinstance(value, int):
-                    continue
-                elif value < 0:
-                    continue
-            elif key == "temperature":
-                # Accept float in [0,2]; None to unset
-                if value is None:
-                    pass
-                elif not isinstance(value, (int, float)):
-                    continue
-                elif not (0.0 <= float(value) <= 2.0):
-                    continue
-            elif key == "reasoning_effort":
-                # Accept known strings; leniently allow any string
-                if value is None:
-                    pass
-                elif not isinstance(value, str):
-                    continue
-            elif key == "reasoning_verbosity":
-                if value is None:
-                    pass
-                elif not isinstance(value, str):
-                    continue
-            elif key == "reasoning_model_patterns":
-                # Expect dict[str, list[str]]
-                if value is None:
-                    pass
-                elif not isinstance(value, dict):
-                    continue
-                else:
-                    ok = True
-                    for k, v in value.items():
-                        if not isinstance(k, str) or not isinstance(v, list) or not all(isinstance(x, str) for x in v):
-                            ok = False
-                            break
-                    if not ok:
-                        continue
-            elif key == "system_prompt_file":
-                # Accept None or string path
-                if value is None:
-                    pass
-                elif not isinstance(value, str) or not value.strip():
-                    continue
-            elif key == "system_prompt_text":
-                # Accept None or non-empty string
-                if value is None:
-                    pass
-                elif not isinstance(value, str) or not value.strip():
-                    continue
-
-            updated_settings[key] = value
-            applied_updates[key] = value
-
-        # Save updated settings
-        save_settings(updated_settings)
-
-        return {
-            "success": True,
-            "message": f"Configuration updated successfully. Applied changes: {applied_updates}",
-            "updated_settings": applied_updates,
-            "current_settings": updated_settings,
-        }
-
-    except Exception as e:
-        return {"success": False, "message": f"Error updating configuration: {e}", "updated_settings": {}, "current_settings": load_settings()}
+        with path.open("rb") as f:
+            return tomllib.load(f)
+    except FileNotFoundError as exc:
+        raise ConfigError(f"Config file not found: {path}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"Invalid TOML in config: {path}") from exc
 
 
-def get_setting(key: str, default=None):
-    """Get a specific setting value.
+def load_app_config(path: Optional[Path]) -> AppConfig:
+    raw_config = _load_raw_config(path) if path else {}
 
-    Args:
-        key: Setting key to retrieve
-        default: Default value if key not found
+    provider_data = raw_config.get("provider", {})
+    provider = ProviderConfig(
+        name=provider_data.get("name", "openai"),
+        base_url=provider_data.get("base_url"),
+        api_key_env=provider_data.get("api_key_env", "OPENAI_API_KEY"),
+        model=provider_data.get("model", "gpt-4.1-mini"),
+        model_params=provider_data.get("model_params", {}) or {},
+    )
 
-    Returns:
-        Setting value or default
-    """
-    settings = load_settings()
-    return settings.get(key, default)
+    agent_data = raw_config.get("agent", {})
+    history_dir = agent_data.get("history_dir", "~/.local/share/cli-agent")
+    agent = AgentConfig(
+        max_steps=int(agent_data.get("max_steps", 20)),
+        timeout_sec=int(agent_data.get("timeout_sec", 90)),
+        max_tool_calls_per_step=int(agent_data.get("max_tool_calls_per_step", 10)),
+        history_dir=_expand_path(history_dir),
+        session=str(agent_data.get("session", "default")),
+    )
+
+    prompt_data = raw_config.get("prompt", {}) or {}
+    custom_mode = prompt_data.get("custom_prompt_mode", "developer")
+    if custom_mode not in ("developer", "system"):
+        raise ConfigError("prompt.custom_prompt_mode must be 'developer' or 'system'")
+    sys_prompt_raw = prompt_data.get("system_prompt")
+    system_prompt = DEFAULT_SYSTEM_PROMPT if sys_prompt_raw is None or str(sys_prompt_raw).strip() == "" else sys_prompt_raw
+    prompt = PromptConfig(
+        system_prompt=system_prompt,
+        custom_prompt=prompt_data.get("custom_prompt", ""),
+        custom_prompt_mode=custom_mode,
+    )
+
+    ui_data = raw_config.get("ui", {})
+    ui = UIConfig(
+        rich=bool(ui_data.get("rich", True)),
+        show_tool_args=bool(ui_data.get("show_tool_args", True)),
+        show_step_summary=bool(ui_data.get("show_step_summary", True)),
+    )
+
+    tools_data = raw_config.get("tools", {}) or {}
+
+    return AppConfig(provider=provider, agent=agent, prompt=prompt, ui=ui, tools=tools_data, path=path)
