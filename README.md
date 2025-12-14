@@ -6,8 +6,8 @@ Async CLI backend for LLM-powered automation. The agent runs as a single command
 1. Install deps: `uv sync --extra dev` (or `pip install -e .[dev]`).
 2. Provide an API key: `export OPENAI_API_KEY=...` (configurable `api_key_env`).
 3. Install the CLI: `uv tool install .` (installs `cli-agent` on PATH).
-4. Run once (e.g., `cli-agent --version`) to bootstrap config and the zsh plugin at `~/.config/cli-agent/plugin.zsh` (or alongside your chosen `--config`).
-5. Add `source ~/.config/cli-agent/plugin.zsh` to your `~/.zshrc`, open a new shell, and use the `@` prefix (e.g., `@summarize README.md`). `/reset` or `@/reset` clears chat/nl history locally.
+4. Run once (e.g., `cli-agent --version`) to bootstrap config and shell plugins at `~/.config/cli-agent/plugin.{zsh,bash}` (or alongside your chosen `--config`).
+5. Source the matching plugin in your shell init (`~/.zshrc` or `~/.bashrc`), open a new shell, and use the `@` prefix (e.g., `@summarize README.md`). `/reset` or `@/reset` clears chat/nl history locally.
 
 Install globally with `uv tool install .` to make `cli-agent` available on PATH. Running with no arguments prints nothing and exits successfully.
 
@@ -62,11 +62,11 @@ show_step_summary = true
 - Natural-language shell prefix entries: `history_dir/<session>/nl_history.txt`
 - `cli-agent Reset` or `cli-agent --reset` truncates both files atomically.
 
-## zsh Plugin
-The CLI writes `plugin.zsh` next to your active config (default `~/.config/cli-agent/plugin.zsh`) and prints a reminder when it creates/updates it. Source that file in your `~/.zshrc` to enable a prefix trigger (default `@`). With the prefix in the buffer:
-- Enter runs `cli-agent "<payload>"`.
-- Stdout `ADD ...` lines are executed; stderr shows the Rich UI.
-- Up/Down arrows cycle through `nl_history.txt`; without the prefix, shell history behaves normally.
+## Shell Plugins
+The CLI writes `plugin.zsh` and `plugin.bash` next to your active config (default `~/.config/cli-agent/`) and prints a reminder when it creates/updates them. Source the one that matches your shell to enable the `@` prefix and nl-history navigation.
+- Common: Enter runs `cli-agent "<payload>"`; stdout `ADD ...` lines are executed; stderr shows the Rich UI.
+- zsh: `source ~/.config/cli-agent/plugin.zsh`; Up/Down arrows cycle through `nl_history.txt` when the prefix is present.
+- bash: `source ~/.config/cli-agent/plugin.bash`; Up/Down arrows walk `nl_history.txt` for prefixed input while regular shell history keeps working otherwise.
 
 ## Development
 - Tests: `uv run pytest` (smoke tests mock the LLM client; no network needed).

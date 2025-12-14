@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
 
+ROOT = Path(__file__).resolve().parent.parent
+
 
 def is_reset_command(text: str | None) -> bool:
     """Return True when the input requests a reset (/reset or reset)."""
@@ -12,15 +14,36 @@ def is_reset_command(text: str | None) -> bool:
     return normalized in ("reset", "/reset")
 
 
-def _load_plugin_content() -> str:
-    from pathlib import Path as _Path
-
-    source = _Path(__file__).resolve().parent.parent / "zsh" / "plugin.zsh"
+def _load_plugin_content(relative_path: Path, fallback: str) -> str:
     try:
-        return source.read_text(encoding="utf-8")
+        return relative_path.read_text(encoding="utf-8")
     except OSError:
-        # Fallback copy if the file is not present in the installed wheel.
-        return """# Minimal zsh integration for cli-agent
+        return fallback
+
+
+def _ensure_plugin(config_path: Path, filename: str, content: str) -> Tuple[Path, bool]:
+    """
+    Ensure the given plugin file exists next to the active config.
+
+    Returns (plugin_path, changed_flag).
+    """
+    plugin_path = config_path.expanduser().resolve().parent / filename
+    plugin_path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing = None
+    try:
+        existing = plugin_path.read_text(encoding="utf-8")
+    except OSError:
+        existing = None
+
+    if existing != content:
+        plugin_path.write_text(content, encoding="utf-8")
+        return plugin_path, True
+
+    return plugin_path, False
+
+
+_ZSH_PLUGIN_FALLBACK = """# Minimal zsh integration for cli-agent
 
 if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]] && whence -w _cli_agent_accept_line >/dev/null 2>&1; then
   # Ensure widgets stay bound even if re-sourced.
@@ -148,8 +171,124 @@ zle -N up-line-or-history _cli_agent_history_up
 zle -N down-line-or-history _cli_agent_history_down
 """
 
+_BASH_PLUGIN_FALLBACK = """# Minimal bash integration for cli-agent
 
-DEFAULT_ZSH_PLUGIN_CONTENT = _load_plugin_content()
+[[ -n "${BASH_VERSION:-}" ]] || return
+
+: "${CLI_AGENT_PREFIX:=@}"
+: "${CLI_AGENT_SESSION:=default}"
+: "${CLI_AGENT_HISTORY_DIR:=${HOME}/.local/share/cli-agent}"
+
+_cli_agent_history_file="${CLI_AGENT_HISTORY_DIR}/${CLI_AGENT_SESSION}/nl_history.txt"
+_cli_agent_nl_history=()
+_cli_agent_nl_index=0
+_cli_agent_shell_hist_offset=0
+
+_cli_agent_refresh_history() {
+  if [[ -f "${_cli_agent_history_file}" ]]; then
+    mapfile -t _cli_agent_nl_history < "${_cli_agent_history_file}"
+  else
+    _cli_agent_nl_history=()
+  fi
+  _cli_agent_nl_index=${#_cli_agent_nl_history[@]}
+}
+
+_cli_agent_refresh_history
+
+_cli_agent_run_payload() {
+  local payload="$1"
+  local output
+  output=$(cli-agent --session "${CLI_AGENT_SESSION}" "${payload}")
+  while IFS= read -r line; do
+    if [[ "$line" == ADD\\ * ]]; then
+      eval "${line#ADD }"
+    fi
+  done <<< "${output}"
+  _cli_agent_refresh_history
+}
+
+_cli_agent_accept_line() {
+  local prefix="${CLI_AGENT_PREFIX}"
+  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    local payload="${READLINE_LINE#${prefix}}"
+    printf '\\n'
+    _cli_agent_run_payload "${payload}"
+    READLINE_LINE=""
+    READLINE_POINT=0
+    _cli_agent_shell_hist_offset=0
+  else
+    READLINE_DONE=1
+    READLINE_POINT=${#READLINE_LINE}
+    _cli_agent_shell_hist_offset=0
+  fi
+}
+
+_cli_agent_history_up() {
+  local prefix="${CLI_AGENT_PREFIX}"
+  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    if (( _cli_agent_nl_index > 0 )); then
+      ((_cli_agent_nl_index--))
+      READLINE_LINE="${prefix}${_cli_agent_nl_history[_cli_agent_nl_index]}"
+      READLINE_POINT=${#READLINE_LINE}
+    fi
+    return
+  fi
+
+  local limit=${HISTCMD:-0}
+  if (( _cli_agent_shell_hist_offset < limit )); then
+    ((_cli_agent_shell_hist_offset++))
+    local entry
+    entry=$(fc -ln -${_cli_agent_shell_hist_offset} -${_cli_agent_shell_hist_offset} 2>/dev/null)
+    if [[ -n "${entry}" ]]; then
+      READLINE_LINE="${entry}"
+      READLINE_POINT=${#READLINE_LINE}
+    fi
+  fi
+}
+
+_cli_agent_history_down() {
+  local prefix="${CLI_AGENT_PREFIX}"
+  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    local total=${#_cli_agent_nl_history[@]}
+    if (( _cli_agent_nl_index < total )); then
+      ((_cli_agent_nl_index++))
+      if (( _cli_agent_nl_index == total )); then
+        READLINE_LINE="${prefix}"
+      else
+        READLINE_LINE="${prefix}${_cli_agent_nl_history[_cli_agent_nl_index]}"
+      fi
+      READLINE_POINT=${#READLINE_LINE}
+    fi
+    return
+  fi
+
+  if (( _cli_agent_shell_hist_offset > 1 )); then
+    ((_cli_agent_shell_hist_offset--))
+    local entry
+    entry=$(fc -ln -${_cli_agent_shell_hist_offset} -${_cli_agent_shell_hist_offset} 2>/dev/null)
+    READLINE_LINE="${entry}"
+    READLINE_POINT=${#READLINE_LINE}
+  elif (( _cli_agent_shell_hist_offset == 1 )); then
+    _cli_agent_shell_hist_offset=0
+    READLINE_LINE=""
+    READLINE_POINT=0
+  fi
+}
+
+bind -x '"\\C-m":_cli_agent_accept_line'
+bind -x '"\\C-j":_cli_agent_accept_line'
+bind -x '"\\e[A":_cli_agent_history_up'
+bind -x '"\\e[B":_cli_agent_history_down'
+
+CLI_AGENT_PLUGIN_LOADED=1
+"""
+
+DEFAULT_ZSH_PLUGIN_CONTENT = _load_plugin_content(
+    ROOT / "zsh" / "plugin.zsh", _ZSH_PLUGIN_FALLBACK
+)
+DEFAULT_BASH_PLUGIN_CONTENT = _load_plugin_content(
+    ROOT / "bash" / "plugin.bash", _BASH_PLUGIN_FALLBACK
+)
 
 
 def ensure_zsh_plugin(config_path: Path) -> Tuple[Path, bool]:
@@ -158,17 +297,13 @@ def ensure_zsh_plugin(config_path: Path) -> Tuple[Path, bool]:
 
     Returns (plugin_path, changed_flag).
     """
-    plugin_path = config_path.expanduser().resolve().parent / "plugin.zsh"
-    plugin_path.parent.mkdir(parents=True, exist_ok=True)
+    return _ensure_plugin(config_path, "plugin.zsh", DEFAULT_ZSH_PLUGIN_CONTENT)
 
-    existing = None
-    try:
-        existing = plugin_path.read_text(encoding="utf-8")
-    except OSError:
-        existing = None
 
-    if existing != DEFAULT_ZSH_PLUGIN_CONTENT:
-        plugin_path.write_text(DEFAULT_ZSH_PLUGIN_CONTENT, encoding="utf-8")
-        return plugin_path, True
+def ensure_bash_plugin(config_path: Path) -> Tuple[Path, bool]:
+    """
+    Ensure the bash plugin is written next to the active config.
 
-    return plugin_path, False
+    Returns (plugin_path, changed_flag).
+    """
+    return _ensure_plugin(config_path, "plugin.bash", DEFAULT_BASH_PLUGIN_CONTENT)
