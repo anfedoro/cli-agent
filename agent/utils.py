@@ -185,6 +185,17 @@ _cli_agent_nl_history=()
 _cli_agent_nl_index=0
 _cli_agent_shell_hist_offset=0
 
+_cli_agent_prompt_reset() {
+  _cli_agent_shell_hist_offset=0
+  _cli_agent_nl_index=${#_cli_agent_nl_history[@]}
+}
+
+if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+  PROMPT_COMMAND=(_cli_agent_prompt_reset "${PROMPT_COMMAND[@]}")
+else
+  PROMPT_COMMAND="_cli_agent_prompt_reset${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+fi
+
 _cli_agent_refresh_history() {
   if [[ -f "${_cli_agent_history_file}" ]]; then
     mapfile -t _cli_agent_nl_history < "${_cli_agent_history_file}"
@@ -211,6 +222,7 @@ _cli_agent_run_payload() {
 _cli_agent_history_up() {
   local prefix="${CLI_AGENT_PREFIX}"
   if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    _cli_agent_shell_hist_offset=0
     if (( _cli_agent_nl_index > 0 )); then
       ((_cli_agent_nl_index--))
       READLINE_LINE="${prefix}${_cli_agent_nl_history[_cli_agent_nl_index]}"
@@ -223,7 +235,8 @@ _cli_agent_history_up() {
   if (( _cli_agent_shell_hist_offset < limit )); then
     ((_cli_agent_shell_hist_offset++))
     local entry
-    entry=$(fc -ln -${_cli_agent_shell_hist_offset} -${_cli_agent_shell_hist_offset} 2>/dev/null)
+    entry=$(builtin history -p "!-${_cli_agent_shell_hist_offset}" 2>/dev/null)
+    entry=${entry%$'\\n'}
     if [[ -n "${entry}" ]]; then
       READLINE_LINE="${entry}"
       READLINE_POINT=${#READLINE_LINE}
@@ -234,6 +247,7 @@ _cli_agent_history_up() {
 _cli_agent_history_down() {
   local prefix="${CLI_AGENT_PREFIX}"
   if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    _cli_agent_shell_hist_offset=0
     local total=${#_cli_agent_nl_history[@]}
     if (( _cli_agent_nl_index < total )); then
       ((_cli_agent_nl_index++))
@@ -250,7 +264,8 @@ _cli_agent_history_down() {
   if (( _cli_agent_shell_hist_offset > 1 )); then
     ((_cli_agent_shell_hist_offset--))
     local entry
-    entry=$(fc -ln -${_cli_agent_shell_hist_offset} -${_cli_agent_shell_hist_offset} 2>/dev/null)
+    entry=$(builtin history -p "!-${_cli_agent_shell_hist_offset}" 2>/dev/null)
+    entry=${entry%$'\\n'}
     READLINE_LINE="${entry}"
     READLINE_POINT=${#READLINE_LINE}
   elif (( _cli_agent_shell_hist_offset == 1 )); then
