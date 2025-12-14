@@ -58,11 +58,12 @@ _cli_agent_history_up() {
     return
   fi
 
-  local limit=${HISTCMD:-0}
-  if (( _cli_agent_shell_hist_offset < limit )); then
+  local max_offset=$((HISTCMD - 1))
+  if (( _cli_agent_shell_hist_offset < max_offset )); then
     ((_cli_agent_shell_hist_offset++))
     local entry
-    entry=$(builtin history -p "!-${_cli_agent_shell_hist_offset}" 2>/dev/null)
+    local target=$((HISTCMD - _cli_agent_shell_hist_offset))
+    entry=$(builtin history -p "!${target}" 2>/dev/null)
     entry=${entry%$'\n'}
     if [[ -n "${entry}" ]]; then
       READLINE_LINE="${entry}"
@@ -91,7 +92,8 @@ _cli_agent_history_down() {
   if (( _cli_agent_shell_hist_offset > 1 )); then
     ((_cli_agent_shell_hist_offset--))
     local entry
-    entry=$(builtin history -p "!-${_cli_agent_shell_hist_offset}" 2>/dev/null)
+    local target=$((HISTCMD - _cli_agent_shell_hist_offset))
+    entry=$(builtin history -p "!${target}" 2>/dev/null)
     entry=${entry%$'\n'}
     READLINE_LINE="${entry}"
     READLINE_POINT=${#READLINE_LINE}
