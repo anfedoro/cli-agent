@@ -70,7 +70,7 @@ _cli_agent_accept_line() {
     BUFFER=""
     zle redisplay
     _cli_agent_run_payload "${payload}"
-    zle redisplay
+    zle reset-prompt
   else
     zle cli-agent-orig-accept-line
   fi
@@ -82,7 +82,7 @@ _cli_agent_history_up() {
       (( _cli_agent_nl_index-- ))
       BUFFER="${CLI_AGENT_PREFIX}${_cli_agent_nl_history[_cli_agent_nl_index]}"
       CURSOR=${#BUFFER}
-      zle redisplay
+      zle reset-prompt
     else
       zle -M "start of cli-agent history"
     fi
@@ -101,7 +101,7 @@ _cli_agent_history_down() {
       BUFFER="${CLI_AGENT_PREFIX}"
     fi
     CURSOR=${#BUFFER}
-    zle redisplay
+    zle reset-prompt
   else
     zle cli-agent-orig-down-line-or-history
   fi
