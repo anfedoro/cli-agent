@@ -72,7 +72,11 @@ _cli_agent_accept_line() {
     _cli_agent_run_payload "${payload}"
     zle reset-prompt
   else
-    zle cli-agent-orig-accept-line
+    if whence -w cli-agent-orig-accept-line >/dev/null 2>&1; then
+      zle cli-agent-orig-accept-line
+    else
+      zle .accept-line
+    fi
   fi
 }
 
@@ -87,7 +91,11 @@ _cli_agent_history_up() {
       zle -M "start of cli-agent history"
     fi
   else
-    zle cli-agent-orig-up-line-or-history
+    if whence -w cli-agent-orig-up-line-or-history >/dev/null 2>&1; then
+      zle cli-agent-orig-up-line-or-history
+    else
+      zle .up-line-or-history
+    fi
   fi
 }
 
@@ -103,19 +111,35 @@ _cli_agent_history_down() {
     CURSOR=${#BUFFER}
     zle reset-prompt
   else
-    zle cli-agent-orig-down-line-or-history
+    if whence -w cli-agent-orig-down-line-or-history >/dev/null 2>&1; then
+      zle cli-agent-orig-down-line-or-history
+    else
+      zle .down-line-or-history
+    fi
   fi
 }
 
 # Preserve original widgets (only if not already captured)
 if ! whence -w cli-agent-orig-accept-line >/dev/null 2>&1; then
-  zle -A accept-line cli-agent-orig-accept-line
+  if zle -A accept-line cli-agent-orig-accept-line 2>/dev/null; then
+    :
+  else
+    zle -A .accept-line cli-agent-orig-accept-line
+  fi
 fi
 if ! whence -w cli-agent-orig-up-line-or-history >/dev/null 2>&1; then
-  zle -A up-line-or-history cli-agent-orig-up-line-or-history
+  if zle -A up-line-or-history cli-agent-orig-up-line-or-history 2>/dev/null; then
+    :
+  else
+    zle -A .up-line-or-history cli-agent-orig-up-line-or-history
+  fi
 fi
 if ! whence -w cli-agent-orig-down-line-or-history >/dev/null 2>&1; then
-  zle -A down-line-or-history cli-agent-orig-down-line-or-history
+  if zle -A down-line-or-history cli-agent-orig-down-line-or-history 2>/dev/null; then
+    :
+  else
+    zle -A .down-line-or-history cli-agent-orig-down-line-or-history
+  fi
 fi
 
 # Override with cli-agent aware widgets
