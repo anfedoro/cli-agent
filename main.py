@@ -17,7 +17,7 @@ from agent.config import (
 from agent.history import HistoryStore
 from agent.loop import run_agent
 from agent.ui import build_console
-from agent.utils import is_reset_command
+from agent.utils import ensure_zsh_plugin, is_reset_command
 
 APP_VERSION = "0.4.2"
 
@@ -85,6 +85,10 @@ def main() -> int:
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
         return 1
+
+    plugin_path, plugin_changed = ensure_zsh_plugin(config.path or Path("~/.config/cli-agent/config.toml"))
+    if plugin_changed:
+        print(f"Installed zsh plugin at {plugin_path}. Add 'source {plugin_path}' to your ~/.zshrc to enable the @ prefix.", file=sys.stderr)
 
     history = HistoryStore(config.agent.history_dir, args.session or config.agent.session)
 

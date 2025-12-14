@@ -6,7 +6,6 @@ from agent.history import HistoryStore
 from agent.llm_client import LLMResponse
 from agent.loop import run_agent
 from agent.ui import build_console
-from agent.utils import is_reset_command
 
 
 @pytest.mark.asyncio

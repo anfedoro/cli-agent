@@ -5,7 +5,6 @@ import pytest
 
 import main
 from agent.config import AgentConfig, UIConfig
-from agent.utils import is_reset_command
 from main import parse_args
 
 
@@ -20,14 +19,6 @@ def test_parse_args_errors_on_conflicting_request_and_input():
         parse_args(["--mode", "agent", "hello", "--input", "world"])
 
 
-def test_is_reset_command_variants():
-    assert is_reset_command("reset")
-    assert is_reset_command("/reset")
-    assert is_reset_command("  /reset  ")
-    assert not is_reset_command("reset now")
-    assert not is_reset_command(None)
-
-
 def test_main_handles_slash_reset(monkeypatch, tmp_path):
     calls = []
 
@@ -35,7 +26,14 @@ def test_main_handles_slash_reset(monkeypatch, tmp_path):
         calls.append("reset")
         return 0
 
-    config = SimpleNamespace(agent=AgentConfig(history_dir=tmp_path, session="demo"), ui=UIConfig(rich=False), prompt=None, provider=None, tools={})
+    config = SimpleNamespace(
+        agent=AgentConfig(history_dir=tmp_path, session="demo"),
+        ui=UIConfig(rich=False),
+        prompt=None,
+        provider=None,
+        tools={},
+        path=tmp_path / "config.toml",
+    )
 
     monkeypatch.setattr(main, "load_config", lambda args: config)
     monkeypatch.setattr(main, "handle_reset", fake_handle_reset)

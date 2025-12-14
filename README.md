@@ -5,19 +5,16 @@ Async CLI backend for LLM-powered automation. The agent runs as a single command
 ## Quickstart
 1. Install deps: `uv sync --extra dev` (or `pip install -e .[dev]`).
 2. Provide an API key: `export OPENAI_API_KEY=...` (configurable `api_key_env`).
-3. Run requests:
-   - `cli-agent "Summarize the repo"`
-   - `cli-agent --mode agent --input "Summarize the repo"` (compatibility with wrappers using mode/input flags)
-   - `cli-agent --version` (check installed version)
-   - `cli-agent --reset` (truncate chat and nl history)
-   - `cli-agent --config /path/config.toml --session demo "Plan work"`
+3. Install the CLI: `uv tool install .` (installs `cli-agent` on PATH).
+4. Run once (e.g., `cli-agent --version`) to bootstrap config and the zsh plugin at `~/.config/cli-agent/plugin.zsh` (or alongside your chosen `--config`).
+5. Add `source ~/.config/cli-agent/plugin.zsh` to your `~/.zshrc`, open a new shell, and use the `@` prefix (e.g., `@summarize README.md`). `/reset` or `@/reset` clears chat/nl history locally.
 
 Install globally with `uv tool install .` to make `cli-agent` available on PATH. Running with no arguments prints nothing and exits successfully.
 
 ## Configuration (TOML)
 Search order: `--config` flag > `CLI_AGENT_CONFIG` env > `~/.config/cli-agent/config.toml` > `./config.toml`.
 If nothing is found, cli-agent writes a default config to `CLI_AGENT_CONFIG` (when set) or `~/.config/cli-agent/config.toml`; a template copy is available at `config.example.toml`.
-- A built-in secure system prompt is used unless you explicitly set `prompt.system_prompt` in the config; overriding it is possible but may weaken safety.
+- The system prompt is baked into the binary and not written to configs. Leave `prompt.system_prompt` empty to use it; override only if you accept weaker safety.
 - Extra OpenAI parameters (e.g., `temperature`, `max_output_tokens`, `reasoning_effort`) can be set under `[provider.model_params]` and are passed through as-is.
 
 ```toml
@@ -39,7 +36,8 @@ history_dir = "~/.local/share/cli-agent"
 session = "default"
 
 [prompt]
-system_prompt = "You are cli-agent..."
+# leave blank to use the built-in secure system prompt (recommended)
+system_prompt = ""
 custom_prompt = ""
 custom_prompt_mode = "developer"  # or "system" to append to the system message
 
@@ -51,12 +49,12 @@ show_step_summary = true
 
 ## How It Works
 - CLI builds message history from `history_dir/<session>/chat.jsonl` and appends the new request.
+- History is stored as lean lines (`role<TAB>content`): user text, tool call summaries (`tool\tname(args)`), and assistant replies; tool outputs are not persisted. Legacy JSON history is compacted on read.
 - Async LLM calls (OpenAI client) run under a Rich spinner on stderr.
 - Tool calls are executed (`write_file`, `read_file`, `run_cmd`, `ask_user`), recorded in history, and iterated until completion or `max_steps`.
 - Final assistant text prints to stderr; lines starting with `ADD ` are emitted on stdout only for shell execution.
-- Reset clears `chat.jsonl` and `nl_history.txt` without touching config.
-- Prompts: `prompt.system_prompt` sets the base instructions; `prompt.custom_prompt` is added as a developer
-  message (or appended to the system message when `prompt.custom_prompt_mode` is `"system"`).
+- Reset clears `chat.jsonl` and `nl_history.txt` without touching config; commands `/reset` or `reset` are intercepted locally (no LLM call) and behave like `--reset`.
+- Prompts: leave `prompt.system_prompt` empty to use the built-in secure prompt. `prompt.custom_prompt` is added as a developer message (or appended to the system message when `prompt.custom_prompt_mode` is `"system"`).
 - Legacy keys from older configs (e.g., `default_mode`, `history_length`, `prompt_indicator`, `system_prompt_file/system_prompt_text`) are ignored.
 
 ## History & NL Commands
@@ -65,7 +63,7 @@ show_step_summary = true
 - `cli-agent Reset` or `cli-agent --reset` truncates both files atomically.
 
 ## zsh Plugin
-Source `zsh/plugin.zsh` to enable a prefix trigger (default `@`). With the prefix in the buffer:
+The CLI writes `plugin.zsh` next to your active config (default `~/.config/cli-agent/plugin.zsh`) and prints a reminder when it creates/updates it. Source that file in your `~/.zshrc` to enable a prefix trigger (default `@`). With the prefix in the buffer:
 - Enter runs `cli-agent "<payload>"`.
 - Stdout `ADD ...` lines are executed; stderr shows the Rich UI.
 - Up/Down arrows cycle through `nl_history.txt`; without the prefix, shell history behaves normally.
