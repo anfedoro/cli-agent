@@ -5,6 +5,7 @@ import asyncio
 import sys
 import os
 from pathlib import Path
+import signal
 
 from agent.config import (
     AppConfig,
@@ -70,8 +71,24 @@ def load_config(args: argparse.Namespace) -> AppConfig:
 
 def handle_reset(history: HistoryStore) -> int:
     history.reset()
-    print("✅@ reset", file=sys.stderr)
+    print("✅ reset", file=sys.stderr)
     return 0
+
+
+def _install_status_signals(config: AppConfig) -> None:
+    def _status_handler(signum, frame) -> None:  # type: ignore[override]
+        print(
+            f"[cli-agent] status: model={config.provider.model}, session={config.agent.session}",
+            file=sys.stderr,
+        )
+
+    for sig_name in ("SIGUSR1", "SIGINFO"):
+        sig = getattr(signal, sig_name, None)
+        if sig:
+            try:
+                signal.signal(sig, _status_handler)
+            except (ValueError, OSError):
+                pass
 
 
 def main() -> int:
@@ -97,6 +114,8 @@ def main() -> int:
         print(f"cli-agent {APP_VERSION}")
         return 0
 
+    _install_status_signals(config)
+
     history = HistoryStore(config.agent.history_dir, args.session or config.agent.session)
 
     request_text = args.request or args.input
@@ -108,8 +127,12 @@ def main() -> int:
 
     console = build_console(config.ui.rich)
 
-    result = asyncio.run(run_agent(request_text, config, history, console))
-    return result.exit_code
+    try:
+        result = asyncio.run(run_agent(request_text, config, history, console))
+        return result.exit_code
+    except KeyboardInterrupt:
+        print("Interrupted", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

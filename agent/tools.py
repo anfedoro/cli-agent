@@ -92,7 +92,15 @@ async def _run_cmd(cmd: str) -> str:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await process.communicate()
+        try:
+            stdout_bytes, stderr_bytes = await process.communicate()
+        except asyncio.CancelledError:
+            try:
+                process.terminate()
+                await asyncio.wait_for(process.wait(), timeout=2)
+            except Exception:
+                process.kill()
+            raise
         result = {
             "cmd": cmd,
             "exit_code": process.returncode,
