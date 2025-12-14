@@ -1,6 +1,6 @@
 # Minimal zsh integration for cli-agent
 
-if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]]; then
+if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]] && whence -w _cli_agent_accept_line >/dev/null 2>&1; then
   return
 fi
 CLI_AGENT_PLUGIN_LOADED=1
