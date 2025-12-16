@@ -278,6 +278,25 @@ _cli_agent_history_down() {
 bind -x '"\\e[A":_cli_agent_history_up'
 bind -x '"\\e[B":_cli_agent_history_down'
 
+_cli_agent_accept_line() {
+  local prefix="${CLI_AGENT_PREFIX}"
+  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    local payload="${READLINE_LINE#${prefix}}"
+    printf '\\n'
+    _cli_agent_run_payload "${payload}"
+    READLINE_LINE=""
+    READLINE_POINT=0
+    _cli_agent_shell_hist_offset=0
+    return
+  fi
+
+  READLINE_DONE=1
+  READLINE_POINT=${#READLINE_LINE}
+}
+
+bind -x '"\\C-m":_cli_agent_accept_line'
+bind -x '"\\C-j":_cli_agent_accept_line'
+
 if declare -f command_not_found_handle >/dev/null 2>&1; then
   eval "$(declare -f command_not_found_handle | sed '1s/command_not_found_handle/_cli_agent_prev_command_not_found_handle/')"
 fi
