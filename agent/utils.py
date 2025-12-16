@@ -185,6 +185,14 @@ _cli_agent_nl_history=()
 _cli_agent_nl_index=0
 _cli_agent_shell_hist_offset=0
 
+_cli_agent_bind_key() {
+  local sequence="$1"
+  local handler="$2"
+  bind -x "\"${sequence}\":${handler}" 2>/dev/null
+  bind -m vi-insert -x "\"${sequence}\":${handler}" 2>/dev/null
+  bind -m vi-command -x "\"${sequence}\":${handler}" 2>/dev/null
+}
+
 _cli_agent_prompt_reset() {
   _cli_agent_shell_hist_offset=0
   _cli_agent_nl_index=${#_cli_agent_nl_history[@]}
@@ -275,9 +283,6 @@ _cli_agent_history_down() {
   fi
 }
 
-bind -x '"\\e[A":_cli_agent_history_up'
-bind -x '"\\e[B":_cli_agent_history_down'
-
 _cli_agent_accept_line() {
   local prefix="${CLI_AGENT_PREFIX}"
   if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
@@ -294,8 +299,10 @@ _cli_agent_accept_line() {
   READLINE_POINT=${#READLINE_LINE}
 }
 
-bind -x '"\\C-m":_cli_agent_accept_line'
-bind -x '"\\C-j":_cli_agent_accept_line'
+_cli_agent_bind_key "\\e[A" _cli_agent_history_up
+_cli_agent_bind_key "\\e[B" _cli_agent_history_down
+_cli_agent_bind_key "\\C-m" _cli_agent_accept_line
+_cli_agent_bind_key "\\C-j" _cli_agent_accept_line
 
 if declare -f command_not_found_handle >/dev/null 2>&1; then
   eval "$(declare -f command_not_found_handle | sed '1s/command_not_found_handle/_cli_agent_prev_command_not_found_handle/')"
