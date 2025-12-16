@@ -1,17 +1,47 @@
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from typing import Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
+class BuiltinCommand(str, Enum):
+    RESET_SESSION = "reset_session"
+    SHOW_CONFIG = "show_config"
+    SHOW_HELP = "show_help"
+    UPDATE_CONFIG = "update_config"
+
+
 def is_reset_command(text: str | None) -> bool:
-    """Return True when the input requests a reset (/reset or reset)."""
+    """Return True when the input requests a reset (/reset, reset, or reset_session)."""
+    cmd, _ = parse_builtin_command(text)
+    return cmd == BuiltinCommand.RESET_SESSION
+
+
+def parse_builtin_command(text: str | None) -> tuple[BuiltinCommand | None, str]:
+    """
+    Return a builtin command identifier and payload if the input matches.
+
+    Payload is the remaining text after the command (used for update config).
+    """
     if not text:
-        return False
-    normalized = text.strip().lower()
-    return normalized in ("reset", "/reset")
+        return None, ""
+    normalized = text.strip()
+    lowered = normalized.lower()
+
+    if lowered in ("reset", "/reset", "reset_session"):
+        return BuiltinCommand.RESET_SESSION, ""
+    if lowered == "show_config":
+        return BuiltinCommand.SHOW_CONFIG, ""
+    if lowered == "show_help":
+        return BuiltinCommand.SHOW_HELP, ""
+    if lowered.startswith("update config"):
+        payload = normalized[len("update config") :].strip()
+        return BuiltinCommand.UPDATE_CONFIG, payload
+
+    return None, ""
 
 
 def _load_plugin_content(relative_path: Path, fallback: str) -> str:

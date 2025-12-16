@@ -10,7 +10,7 @@ from agent.history import HistoryStore
 from agent.llm_client import LLMClientError, LLMResponse, complete_chat
 from agent.tools import TOOL_DEFINITIONS, execute_tool_call
 from agent.ui import status
-from agent.utils import is_reset_command
+from agent.utils import BuiltinCommand, parse_builtin_command
 
 
 @dataclass
@@ -19,10 +19,20 @@ class AgentResult:
     add_lines: List[str]
 
 
-async def run_agent(user_request: str, config: AppConfig, history: HistoryStore, console) -> AgentResult:
+async def run_agent(
+    user_request: str,
+    config: AppConfig,
+    history: HistoryStore,
+    console,
+    builtin_command: BuiltinCommand | None = None,
+) -> AgentResult:
     messages: List[Dict[str, object]] = []
 
-    if is_reset_command(user_request):
+    active_builtin = builtin_command
+    if active_builtin is None:
+        active_builtin, _ = parse_builtin_command(user_request)
+
+    if active_builtin == BuiltinCommand.RESET_SESSION:
         history.reset()
         console.print("✅ reset")
         return AgentResult(exit_code=0, add_lines=[])

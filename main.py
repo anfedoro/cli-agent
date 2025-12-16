@@ -18,7 +18,13 @@ from agent.config import (
 from agent.history import HistoryStore
 from agent.loop import run_agent
 from agent.ui import build_console
-from agent.utils import ensure_bash_plugin, ensure_zsh_plugin, is_reset_command
+from agent.utils import (
+    BuiltinCommand,
+    ensure_bash_plugin,
+    ensure_zsh_plugin,
+    is_reset_command,
+    parse_builtin_command,
+)
 from agent.tools import set_active_config_path
 
 APP_VERSION = "0.4.2"
@@ -76,6 +82,31 @@ def handle_reset(history: HistoryStore) -> int:
     return 0
 
 
+def handle_show_config(config: AppConfig) -> int:
+    cfg_path = (config.path or Path("~/.config/cli-agent/config.toml")).expanduser().resolve()
+    print(f"Active config: {cfg_path}", file=sys.stderr)
+    try:
+        content = cfg_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"Unable to read config: {exc}", file=sys.stderr)
+        return 1
+    print(content, file=sys.stderr)
+    return 0
+
+
+def handle_show_help() -> int:
+    print(
+        "cli-agent built-ins (use with prefix @):\n"
+        "  @reset_session   reset chat/nl history for the current session\n"
+        "  @show_config     print the active config file\n"
+        "  @show_help       show this help text\n"
+        "  @update config <text>   send a config change request to the agent\n"
+        "Legacy /reset remains supported.",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def _install_status_signals(config: AppConfig) -> None:
     def _status_handler(signum, frame) -> None:  # type: ignore[override]
         print(
@@ -130,8 +161,16 @@ def main() -> int:
     set_active_config_path(config.path)
 
     request_text = args.request or args.input
-    if args.reset or is_reset_command(request_text):
+    builtin_command, builtin_payload = parse_builtin_command(request_text)
+
+    if args.reset or builtin_command == BuiltinCommand.RESET_SESSION:
         return handle_reset(history)
+
+    if builtin_command == BuiltinCommand.SHOW_CONFIG:
+        return handle_show_config(config)
+
+    if builtin_command == BuiltinCommand.SHOW_HELP:
+        return handle_show_help()
 
     if not request_text:
         return 0
@@ -139,7 +178,9 @@ def main() -> int:
     console = build_console(config.ui.rich)
 
     try:
-        result = asyncio.run(run_agent(request_text, config, history, console))
+        result = asyncio.run(
+            run_agent(request_text, config, history, console, builtin_command=builtin_command)
+        )
         return result.exit_code
     except KeyboardInterrupt:
         print("Interrupted", file=sys.stderr)

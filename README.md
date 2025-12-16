@@ -7,7 +7,7 @@ Async CLI backend for LLM-powered automation. The agent runs as a single command
 2. Provide an API key: `export OPENAI_API_KEY=...` (configurable `api_key_env`).
 3. Install the CLI: `uv tool install .` (installs `cli-agent` on PATH).
 4. Run once (e.g., `cli-agent --version`) to bootstrap config and shell plugins at `~/.config/cli-agent/plugin.{zsh,bash}` (or alongside your chosen `--config`).
-5. Source the matching plugin in your shell init (`~/.zshrc` or `~/.bashrc`), open a new shell, and use the `@` prefix (e.g., `@summarize README.md`). `/reset` or `@/reset` clears chat/nl history locally.
+5. Source the matching plugin in your shell init (`~/.zshrc` or `~/.bashrc`), open a new shell, and use the `@` prefix (e.g., `@summarize README.md`). Use `@reset_session` to clear chat/nl history locally.
 
 Install globally with `uv tool install .` to make `cli-agent` available on PATH. Running with no arguments prints nothing and exits successfully.
 
@@ -53,7 +53,7 @@ show_step_summary = true
 - Async LLM calls (OpenAI client) run under a Rich spinner on stderr.
 - Tool calls are executed (`write_file`, `read_file`, `run_cmd`, `ask_user`), recorded in history, and iterated until completion or `max_steps`.
 - Final assistant text prints to stderr; lines starting with `ADD ` are emitted on stdout only for shell execution.
-- Reset clears `chat.jsonl` and `nl_history.txt` without touching config; commands `/reset` or `reset` are intercepted locally (no LLM call) and behave like `--reset`.
+- Reset clears `chat.jsonl` and `nl_history.txt` without touching config; use `@reset_session` (or legacy `/reset`) to trigger it locally without an LLM call.
 - Prompts: leave `prompt.system_prompt` empty to use the built-in secure prompt. `prompt.custom_prompt` is added as a developer message (or appended to the system message when `prompt.custom_prompt_mode` is `"system"`).
 - Legacy keys from older configs (e.g., `default_mode`, `history_length`, `prompt_indicator`, `system_prompt_file/system_prompt_text`) are ignored.
 
@@ -66,7 +66,13 @@ show_step_summary = true
 The CLI writes `plugin.zsh` and `plugin.bash` next to your active config (default `~/.config/cli-agent/`) and prints a reminder when it creates/updates them. Source the one that matches your shell to enable the `@` prefix and nl-history navigation.
 - Common: Enter runs `cli-agent "<payload>"`; stdout `ADD ...` lines are executed; stderr shows the Rich UI.
 - zsh: `source ~/.config/cli-agent/plugin.zsh`; Up/Down arrows cycle through `nl_history.txt` when the prefix is present.
-- bash: `source ~/.config/cli-agent/plugin.bash`; Up/Down arrows walk `nl_history.txt` for prefixed input while regular shell history keeps working otherwise; the plugin hooks `command_not_found_handle` to reroute `@...` commands (existing handlers are preserved). Bash treats `/` in command names as paths, so use `@reset` (not `@/reset`) for local reset.
+- bash: `source ~/.config/cli-agent/plugin.bash`; Up/Down arrows walk `nl_history.txt` for prefixed input while regular shell history keeps working otherwise; the plugin hooks `command_not_found_handle` to reroute `@...` commands (existing handlers are preserved). Bash treats `/` in command names as paths, so use `@reset_session` (not `@/reset`) for local reset.
+
+### Built-in @ commands
+- `@reset_session` — truncate chat/nl history for the current session.
+- `@show_config` — print the active config file.
+- `@show_help` — short help on prefix usage.
+- `@update config <text>` — send a config change request to the agent (forwarded to the LLM).
 
 ## Development
 - Tests: `uv run pytest` (smoke tests mock the LLM client; no network needed).
