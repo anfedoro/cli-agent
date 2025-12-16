@@ -19,27 +19,47 @@ _cli_agent_debug() {
   printf 'cli-agent key: %s (%s)\n' "$key" "$mode" >&2
 }
 
+_cli_agent_restore_sequence() {
+  local sequence="$1"
+  for mode in main vi-insert vi-command; do
+    local key="${sequence}|${mode}"
+    local val="${_cli_agent_orig_bindings[$key]}"
+    if [[ "$mode" == "main" ]]; then
+      bind -r "\"${sequence}\"" 2>/dev/null || true
+      [[ -n "$val" ]] && bind ${val} 2>/dev/null || true
+    else
+      bind -m "${mode}" -r "\"${sequence}\"" 2>/dev/null || true
+      [[ -n "$val" ]] && bind -m "${mode}" ${val} 2>/dev/null || true
+    fi
+  done
+}
+
 _cli_agent_bind_key() {
   local sequence="$1"
   local handler="$2"
-  local existing
-  existing=$(bind -v "\"${sequence}\"" 2>/dev/null || true)
-  _cli_agent_orig_bindings["$sequence"]="$existing"
+
+  _cli_agent_orig_bindings["${sequence}|main"]="$(bind -v "\"${sequence}\"" 2>/dev/null || true)"
+  _cli_agent_orig_bindings["${sequence}|vi-insert"]="$(bind -m vi-insert -v "\"${sequence}\"" 2>/dev/null || true)"
+  _cli_agent_orig_bindings["${sequence}|vi-command"]="$(bind -m vi-command -v "\"${sequence}\"" 2>/dev/null || true)"
+
   bind -r "\"${sequence}\"" 2>/dev/null || true
   bind -m vi-insert -r "\"${sequence}\"" 2>/dev/null || true
   bind -m vi-command -r "\"${sequence}\"" 2>/dev/null || true
-  bind -x "\"${sequence}\":${handler}" 2>/dev/null
-  bind -m vi-insert -x "\"${sequence}\":${handler}" 2>/dev/null
-  bind -m vi-command -x "\"${sequence}\":${handler}" 2>/dev/null
+
+  local success=1
+  bind -x "\"${sequence}\":${handler}" 2>/dev/null || success=0
+  bind -m vi-insert -x "\"${sequence}\":${handler}" 2>/dev/null || success=0
+  bind -m vi-command -x "\"${sequence}\":${handler}" 2>/dev/null || success=0
+
+  if (( success == 0 )); then
+    _cli_agent_restore_sequence "${sequence}"
+  fi
 }
 
 _cli_agent_restore_bindings() {
-  for seq in "${!_cli_agent_orig_bindings[@]}"; do
-    bind -r "\"${seq}\"" 2>/dev/null || true
-    local val="${_cli_agent_orig_bindings[$seq]}"
-    if [[ -n "${val}" ]]; then
-      bind ${val} 2>/dev/null || true
-    fi
+  for seq_mode in "${!_cli_agent_orig_bindings[@]}"; do
+    local seq="${seq_mode%%|*}"
+    _cli_agent_restore_sequence "${seq}"
   done
 }
 
