@@ -213,6 +213,7 @@ _cli_agent_history_file="${CLI_AGENT_HISTORY_DIR}/${CLI_AGENT_SESSION}/nl_histor
 _cli_agent_nl_history=()
 _cli_agent_nl_index=0
 _cli_agent_shell_hist_offset=0
+declare -A _cli_agent_orig_bindings
 
 _cli_agent_debug() {
   [[ -z "${CLI_AGENT_DEBUG_KEYS:-}" ]] && return
@@ -224,9 +225,25 @@ _cli_agent_debug() {
 _cli_agent_bind_key() {
   local sequence="$1"
   local handler="$2"
+  local existing
+  existing=$(bind -v "\"${sequence}\"" 2>/dev/null || true)
+  _cli_agent_orig_bindings["$sequence"]="$existing"
+  bind -r "\"${sequence}\"" 2>/dev/null || true
+  bind -m vi-insert -r "\"${sequence}\"" 2>/dev/null || true
+  bind -m vi-command -r "\"${sequence}\"" 2>/dev/null || true
   bind -x "\"${sequence}\":${handler}" 2>/dev/null
   bind -m vi-insert -x "\"${sequence}\":${handler}" 2>/dev/null
   bind -m vi-command -x "\"${sequence}\":${handler}" 2>/dev/null
+}
+
+_cli_agent_restore_bindings() {
+  for seq in "${!_cli_agent_orig_bindings[@]}"; do
+    bind -r "\"${seq}\"" 2>/dev/null || true
+    local val="${_cli_agent_orig_bindings[$seq]}"
+    if [[ -n "${val}" ]]; then
+      bind ${val} 2>/dev/null || true
+    fi
+  done
 }
 
 _cli_agent_prompt_reset() {
