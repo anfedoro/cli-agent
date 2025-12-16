@@ -1,7 +1,6 @@
 # Minimal bash integration for cli-agent
 
 [[ -n "${BASH_VERSION:-}" ]] || return
-[[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]] && return
 
 : "${CLI_AGENT_PREFIX:=@}"
 : "${CLI_AGENT_SESSION:=default}"
