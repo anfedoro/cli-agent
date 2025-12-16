@@ -11,6 +11,13 @@ _cli_agent_nl_history=()
 _cli_agent_nl_index=0
 _cli_agent_shell_hist_offset=0
 
+_cli_agent_debug() {
+  [[ -z "${CLI_AGENT_DEBUG_KEYS:-}" ]] && return
+  local key="$1"
+  local mode="$2"
+  printf 'cli-agent key: %s (%s)\n' "$key" "$mode" >&2
+}
+
 _cli_agent_bind_key() {
   local sequence="$1"
   local handler="$2"
@@ -57,6 +64,7 @@ _cli_agent_history_up() {
   local prefix="${CLI_AGENT_PREFIX}"
   local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
   if [[ "$trimmed" == "${prefix}" || "$trimmed" == "${prefix}"* ]]; then
+    _cli_agent_debug "up" "nl"
     _cli_agent_shell_hist_offset=0
     if (( _cli_agent_nl_index > 0 )); then
       ((_cli_agent_nl_index--))
@@ -68,6 +76,7 @@ _cli_agent_history_up() {
     return
   fi
 
+  _cli_agent_debug "up" "shell"
   local limit=${HISTCMD:-0}
   if (( _cli_agent_shell_hist_offset < limit )); then
     ((_cli_agent_shell_hist_offset++))
@@ -85,6 +94,7 @@ _cli_agent_history_down() {
   local prefix="${CLI_AGENT_PREFIX}"
   local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
   if [[ "$trimmed" == "${prefix}" || "$trimmed" == "${prefix}"* ]]; then
+    _cli_agent_debug "down" "nl"
     _cli_agent_shell_hist_offset=0
     local total=${#_cli_agent_nl_history[@]}
     if (( _cli_agent_nl_index < total )); then
@@ -101,6 +111,7 @@ _cli_agent_history_down() {
     return
   fi
 
+  _cli_agent_debug "down" "shell"
   if (( _cli_agent_shell_hist_offset > 1 )); then
     ((_cli_agent_shell_hist_offset--))
     local entry
