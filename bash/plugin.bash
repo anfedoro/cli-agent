@@ -55,13 +55,16 @@ _cli_agent_run_payload() {
 
 _cli_agent_history_up() {
   local prefix="${CLI_AGENT_PREFIX}"
-  if [[ "$READLINE_LINE" == "${prefix}" || "$READLINE_LINE" == "${prefix}"* ]]; then
+  local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
+  if [[ "$trimmed" == "${prefix}" || "$trimmed" == "${prefix}"* ]]; then
     _cli_agent_shell_hist_offset=0
     if (( _cli_agent_nl_index > 0 )); then
       ((_cli_agent_nl_index--))
       READLINE_LINE="${prefix}${_cli_agent_nl_history[_cli_agent_nl_index]}"
-      READLINE_POINT=${#READLINE_LINE}
+    else
+      READLINE_LINE="${prefix}"
     fi
+    READLINE_POINT=${#READLINE_LINE}
     return
   fi
 
@@ -80,7 +83,8 @@ _cli_agent_history_up() {
 
 _cli_agent_history_down() {
   local prefix="${CLI_AGENT_PREFIX}"
-  if [[ "$READLINE_LINE" == "${prefix}" || "$READLINE_LINE" == "${prefix}"* ]]; then
+  local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
+  if [[ "$trimmed" == "${prefix}" || "$trimmed" == "${prefix}"* ]]; then
     _cli_agent_shell_hist_offset=0
     local total=${#_cli_agent_nl_history[@]}
     if (( _cli_agent_nl_index < total )); then
@@ -90,8 +94,10 @@ _cli_agent_history_down() {
       else
         READLINE_LINE="${prefix}${_cli_agent_nl_history[_cli_agent_nl_index]}"
       fi
-      READLINE_POINT=${#READLINE_LINE}
+    else
+      READLINE_LINE="${prefix}"
     fi
+    READLINE_POINT=${#READLINE_LINE}
     return
   fi
 
