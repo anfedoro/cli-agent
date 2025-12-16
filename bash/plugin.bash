@@ -121,6 +121,7 @@ _cli_agent_accept_line() {
     READLINE_LINE=""
     READLINE_POINT=0
     _cli_agent_shell_hist_offset=0
+    READLINE_DONE=1
     return
   fi
 
@@ -147,6 +148,9 @@ command_not_found_handle() {
     printf '\n'
     _cli_agent_run_payload "${payload}"
     _cli_agent_shell_hist_offset=0
+    if ((HISTCMD)); then
+      history -d $((HISTCMD - 1)) >/dev/null 2>&1 || true
+    fi
     return 0
   fi
 
