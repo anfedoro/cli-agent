@@ -228,7 +228,7 @@ _cli_agent_run_payload() {
 
 _cli_agent_history_up() {
   local prefix="${CLI_AGENT_PREFIX}"
-  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+  if [[ "$READLINE_LINE" == "${prefix}" || "$READLINE_LINE" == "${prefix}"* ]]; then
     _cli_agent_shell_hist_offset=0
     if (( _cli_agent_nl_index > 0 )); then
       ((_cli_agent_nl_index--))
@@ -253,7 +253,7 @@ _cli_agent_history_up() {
 
 _cli_agent_history_down() {
   local prefix="${CLI_AGENT_PREFIX}"
-  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+  if [[ "$READLINE_LINE" == "${prefix}" || "$READLINE_LINE" == "${prefix}"* ]]; then
     _cli_agent_shell_hist_offset=0
     local total=${#_cli_agent_nl_history[@]}
     if (( _cli_agent_nl_index < total )); then
