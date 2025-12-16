@@ -339,7 +339,9 @@ _cli_agent_accept_line() {
 }
 
 _cli_agent_bind_key "\\e[A" _cli_agent_history_up
+_cli_agent_bind_key "\\eOA" _cli_agent_history_up
 _cli_agent_bind_key "\\e[B" _cli_agent_history_down
+_cli_agent_bind_key "\\eOB" _cli_agent_history_down
 _cli_agent_bind_key "\\C-m" _cli_agent_accept_line
 _cli_agent_bind_key "\\C-j" _cli_agent_accept_line
 

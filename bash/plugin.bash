@@ -116,7 +116,9 @@ _cli_agent_history_down() {
 }
 
 _cli_agent_bind_key "\\e[A" _cli_agent_history_up
+_cli_agent_bind_key "\\eOA" _cli_agent_history_up
 _cli_agent_bind_key "\\e[B" _cli_agent_history_down
+_cli_agent_bind_key "\\eOB" _cli_agent_history_down
 
 _cli_agent_accept_line() {
   local prefix="${CLI_AGENT_PREFIX}"
