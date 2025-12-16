@@ -10,7 +10,6 @@ _cli_agent_history_file="${CLI_AGENT_HISTORY_DIR}/${CLI_AGENT_SESSION}/nl_histor
 _cli_agent_nl_history=()
 _cli_agent_nl_index=0
 _cli_agent_shell_hist_offset=0
-declare -A _cli_agent_orig_bindings
 
 _cli_agent_debug() {
   [[ -z "${CLI_AGENT_DEBUG_KEYS:-}" ]] && return
@@ -19,48 +18,12 @@ _cli_agent_debug() {
   printf 'cli-agent key: %s (%s)\n' "$key" "$mode" >&2
 }
 
-_cli_agent_restore_sequence() {
-  local sequence="$1"
-  for mode in main vi-insert vi-command; do
-    local key="${sequence}|${mode}"
-    local val="${_cli_agent_orig_bindings[$key]}"
-    if [[ "$mode" == "main" ]]; then
-      bind -r "\"${sequence}\"" 2>/dev/null || true
-      [[ -n "$val" ]] && bind ${val} 2>/dev/null || true
-    else
-      bind -m "${mode}" -r "\"${sequence}\"" 2>/dev/null || true
-      [[ -n "$val" ]] && bind -m "${mode}" ${val} 2>/dev/null || true
-    fi
-  done
-}
-
 _cli_agent_bind_key() {
   local sequence="$1"
   local handler="$2"
-
-  _cli_agent_orig_bindings["${sequence}|main"]="$(bind -v "\"${sequence}\"" 2>/dev/null || true)"
-  _cli_agent_orig_bindings["${sequence}|vi-insert"]="$(bind -m vi-insert -v "\"${sequence}\"" 2>/dev/null || true)"
-  _cli_agent_orig_bindings["${sequence}|vi-command"]="$(bind -m vi-command -v "\"${sequence}\"" 2>/dev/null || true)"
-
-  bind -r "\"${sequence}\"" 2>/dev/null || true
-  bind -m vi-insert -r "\"${sequence}\"" 2>/dev/null || true
-  bind -m vi-command -r "\"${sequence}\"" 2>/dev/null || true
-
-  local success=1
-  bind -x "\"${sequence}\":${handler}" 2>/dev/null || success=0
-  bind -m vi-insert -x "\"${sequence}\":${handler}" 2>/dev/null || success=0
-  bind -m vi-command -x "\"${sequence}\":${handler}" 2>/dev/null || success=0
-
-  if (( success == 0 )); then
-    _cli_agent_restore_sequence "${sequence}"
-  fi
-}
-
-_cli_agent_restore_bindings() {
-  for seq_mode in "${!_cli_agent_orig_bindings[@]}"; do
-    local seq="${seq_mode%%|*}"
-    _cli_agent_restore_sequence "${seq}"
-  done
+  bind -x "\"${sequence}\":${handler}" 2>/dev/null || true
+  bind -m vi-insert -x "\"${sequence}\":${handler}" 2>/dev/null || true
+  bind -m vi-command -x "\"${sequence}\":${handler}" 2>/dev/null || true
 }
 
 _cli_agent_prompt_reset() {
