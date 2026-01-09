@@ -24,6 +24,7 @@ def test_load_app_config_defaults_when_missing():
     assert config.provider.name == "openai"
     assert config.provider.model_params == {}
     assert config.agent.max_steps == 20
+    assert config.agent.follow_cwd is True
     assert config.ui.rich is True
     assert config.prompt.custom_prompt == ""
     assert config.prompt.custom_prompt_mode == "developer"
@@ -47,6 +48,7 @@ max_steps = 3
 timeout_sec = 5
 history_dir = "{history}"
 session = "demo"
+follow_cwd = false
 
 [prompt]
 system_prompt = "Be nice"
@@ -68,6 +70,7 @@ show_tool_args = false
     assert config.agent.timeout_sec == 5
     assert config.agent.history_dir.name == "hist"
     assert config.agent.session == "demo"
+    assert config.agent.follow_cwd is False
     assert config.ui.rich is False
     assert config.ui.show_tool_args is False
     assert config.prompt.system_prompt == "Be nice"

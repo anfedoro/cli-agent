@@ -28,6 +28,7 @@ class AgentConfig:
     max_tool_calls_per_step: int = 10
     history_dir: Path = Path("~/.local/share/cli-agent")
     session: str = "default"
+    follow_cwd: bool = True
 
 
 DEFAULT_SYSTEM_PROMPT = dedent(
@@ -125,6 +126,7 @@ timeout_sec = 90
 max_tool_calls_per_step = 10
 history_dir = "~/.local/share/cli-agent"
 session = "default"
+follow_cwd = true
 
 [prompt]
 # Leave blank to use the built-in secure system prompt. Override at your own risk.
@@ -225,6 +227,7 @@ def load_app_config(path: Optional[Path]) -> AppConfig:
         max_tool_calls_per_step=int(agent_data.get("max_tool_calls_per_step", 10)),
         history_dir=_expand_path(history_dir),
         session=str(agent_data.get("session", "default")),
+        follow_cwd=bool(agent_data.get("follow_cwd", True)),
     )
 
     prompt_data = raw_config.get("prompt", {}) or {}

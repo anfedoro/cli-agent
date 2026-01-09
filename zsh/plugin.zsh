@@ -1,10 +1,18 @@
 # Minimal zsh integration for cli-agent
 
+_cli_agent_restore_clear_screen() {
+  bindkey '^L' clear-screen 2>/dev/null
+  bindkey -M emacs '^L' clear-screen 2>/dev/null
+  bindkey -M viins '^L' clear-screen 2>/dev/null
+  bindkey -M vicmd '^L' clear-screen 2>/dev/null
+}
+
 if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]] && whence -w _cli_agent_accept_line >/dev/null 2>&1; then
   # Ensure widgets stay bound even if re-sourced.
   zle -N accept-line _cli_agent_accept_line
   zle -N up-line-or-history _cli_agent_history_up
   zle -N down-line-or-history _cli_agent_history_down
+  _cli_agent_restore_clear_screen
   return
 fi
 CLI_AGENT_PLUGIN_LOADED=1
@@ -124,3 +132,4 @@ fi
 zle -N accept-line _cli_agent_accept_line
 zle -N up-line-or-history _cli_agent_history_up
 zle -N down-line-or-history _cli_agent_history_down
+_cli_agent_restore_clear_screen

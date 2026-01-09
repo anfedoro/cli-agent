@@ -75,11 +75,19 @@ def _ensure_plugin(config_path: Path, filename: str, content: str) -> Tuple[Path
 
 _ZSH_PLUGIN_FALLBACK = """# Minimal zsh integration for cli-agent
 
+_cli_agent_restore_clear_screen() {
+  bindkey '^L' clear-screen 2>/dev/null
+  bindkey -M emacs '^L' clear-screen 2>/dev/null
+  bindkey -M viins '^L' clear-screen 2>/dev/null
+  bindkey -M vicmd '^L' clear-screen 2>/dev/null
+}
+
 if [[ -n "${CLI_AGENT_PLUGIN_LOADED:-}" ]] && whence -w _cli_agent_accept_line >/dev/null 2>&1; then
   # Ensure widgets stay bound even if re-sourced.
   zle -N accept-line _cli_agent_accept_line
   zle -N up-line-or-history _cli_agent_history_up
   zle -N down-line-or-history _cli_agent_history_down
+  _cli_agent_restore_clear_screen
   return
 fi
 CLI_AGENT_PLUGIN_LOADED=1
@@ -199,6 +207,7 @@ fi
 zle -N accept-line _cli_agent_accept_line
 zle -N up-line-or-history _cli_agent_history_up
 zle -N down-line-or-history _cli_agent_history_down
+_cli_agent_restore_clear_screen
 """
 
 _BASH_PLUGIN_FALLBACK = """# Minimal bash integration for cli-agent
@@ -330,32 +339,26 @@ _cli_agent_history_down() {
   fi
 }
 
-_cli_agent_accept_line() {
-  local prefix="${CLI_AGENT_PREFIX}"
-  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
-    local payload="${READLINE_LINE#${prefix}}"
-    printf '\\n'
-    _cli_agent_run_payload "${payload}"
-    READLINE_LINE=""
-    READLINE_POINT=0
-    _cli_agent_shell_hist_offset=0
-    if ((HISTCMD)); then
-      history -d $((HISTCMD - 1)) >/dev/null 2>&1 || true
-    fi
-    READLINE_DONE=1
-    return
-  fi
-
-  READLINE_DONE=1
-  READLINE_POINT=${#READLINE_LINE}
-}
-
 _cli_agent_bind_key "\\e[A" _cli_agent_history_up
 _cli_agent_bind_key "\\eOA" _cli_agent_history_up
 _cli_agent_bind_key "\\e[B" _cli_agent_history_down
 _cli_agent_bind_key "\\eOB" _cli_agent_history_down
-_cli_agent_bind_key "\\C-m" _cli_agent_accept_line
-_cli_agent_bind_key "\\C-j" _cli_agent_accept_line
+
+_cli_agent_restore_enter() {
+  case "$(bind -X 2>/dev/null)" in
+    *"_cli_agent_accept_line"*)
+      bind '"\\C-m": accept-line'
+      bind '"\\C-j": accept-line'
+      bind -m vi-insert '"\\C-m": accept-line'
+      bind -m vi-insert '"\\C-j": accept-line'
+      bind -m vi-command '"\\C-m": vi-accept-line'
+      bind -m vi-command '"\\C-j": vi-accept-line'
+      ;;
+  esac
+}
+
+_cli_agent_restore_enter
+unset -f _cli_agent_accept_line 2>/dev/null || true
 
 if declare -f command_not_found_handle >/dev/null 2>&1; then
   eval "$(declare -f command_not_found_handle | sed '1s/command_not_found_handle/_cli_agent_prev_command_not_found_handle/')"

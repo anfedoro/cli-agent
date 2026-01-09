@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from shlex import quote
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
 from agent.config import AppConfig
 from agent.history import HistoryStore
 from agent.llm_client import LLMClientError, LLMResponse, complete_chat
-from agent.tools import TOOL_DEFINITIONS, execute_tool_call
+from agent.tools import TOOL_DEFINITIONS, execute_tool_call, get_active_workdir, get_initial_workdir
 from agent.ui import status
 from agent.utils import BuiltinCommand, parse_builtin_command
 
@@ -117,6 +118,13 @@ async def run_agent(
 
         if human_lines and config.ui.show_step_summary:
             console.print("\n".join(human_lines))
+
+        if config.agent.follow_cwd:
+            active_cwd = get_active_workdir()
+            initial_cwd = get_initial_workdir()
+            has_cd = any(line.strip().startswith("ADD cd ") for line in add_lines)
+            if active_cwd and initial_cwd and active_cwd != initial_cwd and not has_cd:
+                add_lines.append(f"ADD cd {quote(str(active_cwd))}")
 
         for line in add_lines:
             print(line, file=sys.stdout)

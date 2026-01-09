@@ -17,6 +17,7 @@ timeout_sec = 90
 max_tool_calls_per_step = 10
 history_dir = "~/.local/share/cli-agent"
 session = "default"
+follow_cwd = true
 
 [prompt]
 # Leave blank to use the built-in secure system prompt. Override at your own risk.

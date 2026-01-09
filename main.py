@@ -25,7 +25,7 @@ from agent.utils import (
     is_reset_command,
     parse_builtin_command,
 )
-from agent.tools import set_active_config_path
+from agent.tools import set_active_config_path, set_active_workdir
 
 APP_VERSION = "0.4.2"
 
@@ -71,6 +71,7 @@ def load_config(args: argparse.Namespace) -> AppConfig:
             max_tool_calls_per_step=config.agent.max_tool_calls_per_step,
             history_dir=config.agent.history_dir,
             session=args.session,
+            follow_cwd=config.agent.follow_cwd,
         )
 
     return config
@@ -159,6 +160,7 @@ def main() -> int:
 
     history = HistoryStore(config.agent.history_dir, args.session or config.agent.session)
     set_active_config_path(config.path)
+    set_active_workdir(Path.cwd())
 
     request_text = args.request or args.input
     builtin_command, builtin_payload = parse_builtin_command(request_text)

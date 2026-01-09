@@ -16,6 +16,7 @@ Search order: `--config` flag > `CLI_AGENT_CONFIG` env > `~/.config/cli-agent/co
 If nothing is found, cli-agent writes a default config to `CLI_AGENT_CONFIG` (when set) or `~/.config/cli-agent/config.toml`; a template copy is available at `config.example.toml`.
 - The system prompt is baked into the binary and not written to configs. Leave `prompt.system_prompt` empty to use it; override only if you accept weaker safety.
 - Extra OpenAI parameters (e.g., `temperature`, `max_output_tokens`, `reasoning_effort`) can be set under `[provider.model_params]` and are passed through as-is.
+- `agent.follow_cwd` controls whether the shell follows the agent's working directory after a run (default true).
 
 ```toml
 [provider]
@@ -34,6 +35,7 @@ timeout_sec = 90
 max_tool_calls_per_step = 10
 history_dir = "~/.local/share/cli-agent"
 session = "default"
+follow_cwd = true
 
 [prompt]
 # leave blank to use the built-in secure system prompt (recommended)

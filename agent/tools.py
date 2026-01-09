@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import shlex
 import tomllib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -94,10 +96,20 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
 ]
 
 _ACTIVE_CONFIG_PATH: Optional[Path] = None
+_ACTIVE_WORKDIR: Optional[Path] = None
+_INITIAL_WORKDIR: Optional[Path] = None
+_PREV_WORKDIR: Optional[Path] = None
+
+
+def _resolve_tool_path(path: str) -> Path:
+    target = Path(path).expanduser()
+    if not target.is_absolute() and _ACTIVE_WORKDIR is not None:
+        target = _ACTIVE_WORKDIR / target
+    return target
 
 
 async def _write_file(path: str, content: str) -> str:
-    target = Path(path).expanduser()
+    target = _resolve_tool_path(path)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
@@ -107,7 +119,7 @@ async def _write_file(path: str, content: str) -> str:
 
 
 async def _read_file(path: str) -> str:
-    target = Path(path).expanduser()
+    target = _resolve_tool_path(path)
     try:
         return target.read_text(encoding="utf-8")
     except Exception as exc:
@@ -116,10 +128,12 @@ async def _read_file(path: str) -> str:
 
 async def _run_cmd(cmd: str) -> str:
     try:
+        cwd = str(_ACTIVE_WORKDIR) if _ACTIVE_WORKDIR else None
         process = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
         )
         try:
             stdout_bytes, stderr_bytes = await process.communicate()
@@ -136,6 +150,11 @@ async def _run_cmd(cmd: str) -> str:
             "stdout": stdout_bytes.decode("utf-8", errors="ignore"),
             "stderr": stderr_bytes.decode("utf-8", errors="ignore"),
         }
+        cd_target = _extract_cd_target(cmd)
+        if cd_target is not None:
+            next_dir = _resolve_cd_target(cd_target)
+            if next_dir is not None:
+                set_active_workdir(next_dir)
         return json.dumps(result)
     except Exception as exc:
         return json.dumps({"cmd": cmd, "error": str(exc)})
@@ -149,6 +168,69 @@ async def _ask_user(question: str) -> str:
 def set_active_config_path(path: Optional[Path]) -> None:
     global _ACTIVE_CONFIG_PATH
     _ACTIVE_CONFIG_PATH = path
+
+
+def set_active_workdir(path: Optional[Path]) -> None:
+    global _ACTIVE_WORKDIR, _INITIAL_WORKDIR, _PREV_WORKDIR
+    if path is None:
+        _ACTIVE_WORKDIR = None
+        _INITIAL_WORKDIR = None
+        _PREV_WORKDIR = None
+        return
+    resolved = path.expanduser().resolve()
+    if _ACTIVE_WORKDIR and _ACTIVE_WORKDIR != resolved:
+        _PREV_WORKDIR = _ACTIVE_WORKDIR
+    _ACTIVE_WORKDIR = resolved
+    if _INITIAL_WORKDIR is None:
+        _INITIAL_WORKDIR = resolved
+
+
+def get_active_workdir() -> Optional[Path]:
+    return _ACTIVE_WORKDIR
+
+
+def get_initial_workdir() -> Optional[Path]:
+    return _INITIAL_WORKDIR
+
+
+def _extract_cd_target(cmd: str) -> Optional[str]:
+    stripped = cmd.strip()
+    if not stripped:
+        return None
+    try:
+        tokens = shlex.split(stripped, posix=os.name != "nt")
+    except ValueError:
+        return None
+    if not tokens:
+        return None
+    head = tokens[0].lower()
+    if head not in ("cd", "chdir"):
+        return None
+    idx = 1
+    if os.name == "nt" and idx < len(tokens) and tokens[idx].lower() == "/d":
+        idx += 1
+    if idx >= len(tokens):
+        return ""
+    target = tokens[idx].rstrip(";")
+    if target in ("&&", "||", ";"):
+        return ""
+    return target
+
+
+def _resolve_cd_target(target: str) -> Optional[Path]:
+    if target == "-":
+        return _PREV_WORKDIR
+    if target == "":
+        return Path.home()
+    expanded = Path(os.path.expandvars(target)).expanduser()
+    base = _ACTIVE_WORKDIR or Path.cwd()
+    if not expanded.is_absolute():
+        expanded = base / expanded
+    try:
+        resolved = expanded.resolve()
+    except OSError:
+        resolved = expanded
+    return resolved if resolved.is_dir() else None
 
 
 def _toml_value(value: Any) -> str:

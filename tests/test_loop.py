@@ -5,6 +5,7 @@ from agent.config import AgentConfig, AppConfig, PromptConfig, ProviderConfig, U
 from agent.history import HistoryStore
 from agent.llm_client import LLMResponse
 from agent.loop import run_agent
+from agent.tools import set_active_workdir
 from agent.ui import build_console
 
 
@@ -132,3 +133,35 @@ async def test_loop_handles_reset_without_llm(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert called["llm"] is False
     assert history.chat_path.read_text(encoding="utf-8") == ""
+
+
+@pytest.mark.asyncio
+async def test_loop_appends_follow_cwd(monkeypatch, capsys, tmp_path):
+    async def fake_complete(messages, tools, provider):
+        return LLMResponse(message={"role": "assistant", "content": "done"}, finish_reason="stop")
+
+    monkeypatch.setattr(loop_module, "complete_chat", fake_complete)
+
+    start_dir = tmp_path
+    follow_dir = tmp_path / "next"
+    follow_dir.mkdir()
+    set_active_workdir(None)
+    set_active_workdir(start_dir)
+    set_active_workdir(follow_dir)
+
+    config = AppConfig(
+        provider=ProviderConfig(api_key_env="DUMMY"),
+        agent=AgentConfig(max_steps=1, timeout_sec=2, history_dir=tmp_path, session="demo"),
+        ui=UIConfig(rich=False),
+        tools={},
+    )
+    history = HistoryStore(tmp_path, "demo")
+    console = build_console(False)
+
+    await run_agent("Hi", config, history, console)
+
+    captured = capsys.readouterr()
+    assert "ADD cd" in captured.out
+    assert str(follow_dir.resolve()) in captured.out
+
+    set_active_workdir(None)
