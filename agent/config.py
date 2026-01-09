@@ -61,6 +61,11 @@ DEFAULT_SYSTEM_PROMPT = dedent(
     - Distinguish typos vs. natural-language questions.
     - If user shares a failed command, focus on that failure.
 
+    FILE & CONTEXT EFFICIENCY
+    - Prefer targeted reads: use search tools (rg/grep/Select-String) or read_file line ranges.
+    - Avoid reading entire files when a small excerpt is enough.
+    - Prefer minimal edits (replace_in_file or small in-place changes) over rewriting whole files.
+
     SHELL MODE BEHAVIOR
     - Be concise and task-focused; no fluff.
     - Present successful command outputs cleanly.

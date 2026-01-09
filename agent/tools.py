@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shlex
 import tomllib
 from pathlib import Path
@@ -29,13 +30,33 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a UTF-8 text file and return its content.",
+            "description": "Read a UTF-8 text file and return its content (optionally by line range).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Path to the file to read"},
+                    "start_line": {"type": "integer", "description": "1-based start line (optional)"},
+                    "end_line": {"type": "integer", "description": "1-based end line (inclusive, optional)"},
                 },
                 "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "replace_in_file",
+            "description": "Replace text in a file using a literal or regex pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to the file to edit"},
+                    "pattern": {"type": "string", "description": "Literal text or regex pattern"},
+                    "replacement": {"type": "string", "description": "Replacement text"},
+                    "regex": {"type": "boolean", "description": "Use regex pattern (default false)"},
+                    "count": {"type": "integer", "description": "Max replacements; 0 or omitted means all"},
+                },
+                "required": ["path", "pattern", "replacement"],
             },
         },
     },
@@ -118,12 +139,71 @@ async def _write_file(path: str, content: str) -> str:
         return f"write_file failed: {exc}"
 
 
-async def _read_file(path: str) -> str:
+async def _read_file(path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
     target = _resolve_tool_path(path)
     try:
-        return target.read_text(encoding="utf-8")
+        if start_line is None and end_line is None:
+            return target.read_text(encoding="utf-8")
+        try:
+            start = int(start_line) if start_line is not None else 1
+            end = int(end_line) if end_line is not None else None
+        except (TypeError, ValueError):
+            return "read_file failed: start_line/end_line must be integers"
+        if start < 1:
+            start = 1
+        if end is not None and end < start:
+            return ""
+        lines: list[str] = []
+        with target.open("r", encoding="utf-8") as handle:
+            for idx, line in enumerate(handle, start=1):
+                if idx < start:
+                    continue
+                if end is not None and idx > end:
+                    break
+                lines.append(line)
+        return "".join(lines)
     except Exception as exc:
         return f"read_file failed: {exc}"
+
+
+async def _replace_in_file(
+    path: str,
+    pattern: str,
+    replacement: str,
+    regex: bool = False,
+    count: int = 0,
+) -> str:
+    if pattern == "":
+        return "replace_in_file failed: pattern must not be empty"
+    target = _resolve_tool_path(path)
+    try:
+        content = target.read_text(encoding="utf-8")
+    except Exception as exc:
+        return f"replace_in_file failed: {exc}"
+    try:
+        max_count = int(count) if count is not None else 0
+    except (TypeError, ValueError):
+        return "replace_in_file failed: count must be an integer"
+    if regex:
+        try:
+            compiled = re.compile(pattern, re.MULTILINE)
+        except re.error as exc:
+            return f"replace_in_file failed: invalid regex ({exc})"
+        new_content, num = compiled.subn(replacement, content, count=max_count if max_count > 0 else 0)
+    else:
+        if max_count <= 0:
+            num = content.count(pattern)
+            new_content = content.replace(pattern, replacement)
+        else:
+            num = min(content.count(pattern), max_count)
+            new_content = content.replace(pattern, replacement, max_count)
+    if num == 0:
+        return f"No matches for pattern in {target}"
+    try:
+        target.write_text(new_content, encoding="utf-8")
+    except Exception as exc:
+        return f"replace_in_file failed: {exc}"
+    return f"Replaced {num} occurrence(s) in {target}"
 
 
 async def _run_cmd(cmd: str) -> str:
@@ -336,7 +416,19 @@ async def execute_tool_call(tool_call: Dict[str, Any]) -> str:
         if name == "write_file":
             return await _write_file(args.get("path", ""), args.get("content", ""))
         if name == "read_file":
-            return await _read_file(args.get("path", ""))
+            return await _read_file(
+                args.get("path", ""),
+                args.get("start_line"),
+                args.get("end_line"),
+            )
+        if name == "replace_in_file":
+            return await _replace_in_file(
+                args.get("path", ""),
+                args.get("pattern", ""),
+                args.get("replacement", ""),
+                bool(args.get("regex", False)),
+                args.get("count", 0),
+            )
         if name == "run_cmd":
             return await _run_cmd(args.get("cmd", ""))
         if name == "ask_user":

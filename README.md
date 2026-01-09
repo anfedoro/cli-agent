@@ -53,7 +53,7 @@ show_step_summary = true
 - CLI builds message history from `history_dir/<session>/chat.jsonl` and appends the new request.
 - History is stored as lean lines (`role<TAB>content`): user text, tool call summaries (`tool\tname(args)`), and assistant replies; tool outputs are not persisted. Legacy JSON history is compacted on read.
 - Async LLM calls (OpenAI client) run under a Rich spinner on stderr.
-- Tool calls are executed (`write_file`, `read_file`, `run_cmd`, `ask_user`), recorded in history, and iterated until completion or `max_steps`.
+- Tool calls are executed (`write_file`, `read_file` with optional line ranges, `replace_in_file`, `run_cmd`, `ask_user`), recorded in history, and iterated until completion or `max_steps`.
 - Final assistant text prints to stderr; lines starting with `ADD ` are emitted on stdout only for shell execution.
 - Reset clears `chat.jsonl` and `nl_history.txt` without touching config; use `@reset_session` (or legacy `/reset`) to trigger it locally without an LLM call.
 - Prompts: leave `prompt.system_prompt` empty to use the built-in secure prompt. `prompt.custom_prompt` is added as a developer message (or appended to the system message when `prompt.custom_prompt_mode` is `"system"`).

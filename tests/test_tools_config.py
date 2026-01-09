@@ -55,6 +55,48 @@ temperature = 0.1
 @pytest.mark.asyncio
 async def test_run_cmd_tracks_cwd(tmp_path):
     set_active_workdir(None)
+
+
+@pytest.mark.asyncio
+async def test_read_file_range(tmp_path):
+    sample = tmp_path / "sample.txt"
+    sample.write_text("one\ntwo\nthree\nfour\n", encoding="utf-8")
+    set_active_workdir(None)
+    set_active_workdir(tmp_path)
+
+    call = {
+        "function": {
+            "name": "read_file",
+            "arguments": json.dumps({"path": "sample.txt", "start_line": 2, "end_line": 3}),
+        }
+    }
+    result = await execute_tool_call(call)
+    assert result == "two\nthree\n"
+
+    set_active_workdir(None)
+
+
+@pytest.mark.asyncio
+async def test_replace_in_file(tmp_path):
+    sample = tmp_path / "sample.txt"
+    sample.write_text("alpha beta alpha\n", encoding="utf-8")
+
+    call = {
+        "function": {
+            "name": "replace_in_file",
+            "arguments": json.dumps(
+                {
+                    "path": str(sample),
+                    "pattern": "alpha",
+                    "replacement": "omega",
+                    "count": 1,
+                }
+            ),
+        }
+    }
+    result = await execute_tool_call(call)
+    assert "Replaced 1 occurrence" in result
+    assert sample.read_text(encoding="utf-8") == "omega beta alpha\n"
     set_active_workdir(tmp_path)
 
     cmd = f'"{sys.executable}" -c "import os; print(os.getcwd())"'
