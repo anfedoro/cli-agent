@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from shlex import quote
 from dataclasses import dataclass
+from shlex import quote
 from typing import Dict, List, Sequence
 
 from agent.config import AppConfig
@@ -12,6 +12,7 @@ from agent.llm_client import LLMClientError, LLMResponse, complete_chat
 from agent.tools import TOOL_DEFINITIONS, execute_tool_call, get_active_workdir, get_initial_workdir
 from agent.ui import status
 from agent.utils import BuiltinCommand, parse_builtin_command
+from rich.markdown import Markdown
 
 
 @dataclass
@@ -117,7 +118,11 @@ async def run_agent(
         human_lines = [line for line in final_text.splitlines() if not line.strip().startswith("ADD ")]
 
         if human_lines and config.ui.show_step_summary:
-            console.print("\n".join(human_lines))
+            human_text = "\n".join(human_lines)
+            if config.ui.rich and config.ui.render_markdown:
+                console.print(Markdown(human_text))
+            else:
+                console.print(human_text)
 
         if config.agent.follow_cwd:
             active_cwd = get_active_workdir()

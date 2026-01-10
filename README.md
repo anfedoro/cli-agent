@@ -47,6 +47,7 @@ custom_prompt_mode = "developer"  # or "system" to append to the system message
 rich = true
 show_tool_args = true
 show_step_summary = true
+render_markdown = true
 ```
 
 ## How It Works

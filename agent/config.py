@@ -94,6 +94,7 @@ class UIConfig:
     rich: bool = True
     show_tool_args: bool = True
     show_step_summary: bool = True
+    render_markdown: bool = True
 
 
 @dataclass
@@ -143,6 +144,7 @@ custom_prompt_mode = "developer"
 rich = true
 show_tool_args = true
 show_step_summary = true
+render_markdown = true
 """
 
 
@@ -252,6 +254,7 @@ def load_app_config(path: Optional[Path]) -> AppConfig:
         rich=bool(ui_data.get("rich", True)),
         show_tool_args=bool(ui_data.get("show_tool_args", True)),
         show_step_summary=bool(ui_data.get("show_step_summary", True)),
+        render_markdown=bool(ui_data.get("render_markdown", True)),
     )
 
     tools_data = raw_config.get("tools", {}) or {}

@@ -26,6 +26,7 @@ def test_load_app_config_defaults_when_missing():
     assert config.agent.max_steps == 20
     assert config.agent.follow_cwd is True
     assert config.ui.rich is True
+    assert config.ui.render_markdown is True
     assert config.prompt.custom_prompt == ""
     assert config.prompt.custom_prompt_mode == "developer"
     assert config.prompt.system_prompt
@@ -58,6 +59,7 @@ custom_prompt_mode = "system"
 [ui]
 rich = false
 show_tool_args = false
+render_markdown = false
         """.format(history=tmp_path / "hist"),
         encoding="utf-8",
     )
@@ -73,6 +75,7 @@ show_tool_args = false
     assert config.agent.follow_cwd is False
     assert config.ui.rich is False
     assert config.ui.show_tool_args is False
+    assert config.ui.render_markdown is False
     assert config.prompt.system_prompt == "Be nice"
     assert config.prompt.custom_prompt == "Add logs"
     assert config.prompt.custom_prompt_mode == "system"

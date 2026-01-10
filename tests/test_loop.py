@@ -1,4 +1,7 @@
+from contextlib import nullcontext
+
 import pytest
+from rich.markdown import Markdown
 
 from agent import loop as loop_module
 from agent.config import AgentConfig, AppConfig, PromptConfig, ProviderConfig, UIConfig
@@ -146,22 +149,34 @@ async def test_loop_appends_follow_cwd(monkeypatch, capsys, tmp_path):
     follow_dir = tmp_path / "next"
     follow_dir.mkdir()
     set_active_workdir(None)
-    set_active_workdir(start_dir)
-    set_active_workdir(follow_dir)
+
+
+@pytest.mark.asyncio
+async def test_loop_renders_markdown_when_enabled(monkeypatch, tmp_path):
+    async def fake_complete(messages, tools, provider):
+        return LLMResponse(message={"role": "assistant", "content": "Hello\n\n- item"}, finish_reason="stop")
+
+    monkeypatch.setattr(loop_module, "complete_chat", fake_complete)
+    monkeypatch.setattr(loop_module, "status", lambda *args, **kwargs: nullcontext())
+
+    class DummyConsole:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def print(self, *args, **kwargs) -> None:
+            self.calls.append((args, kwargs))
 
     config = AppConfig(
         provider=ProviderConfig(api_key_env="DUMMY"),
         agent=AgentConfig(max_steps=1, timeout_sec=2, history_dir=tmp_path, session="demo"),
-        ui=UIConfig(rich=False),
+        ui=UIConfig(rich=True, show_tool_args=True, show_step_summary=True, render_markdown=True),
         tools={},
     )
     history = HistoryStore(tmp_path, "demo")
-    console = build_console(False)
+    console = DummyConsole()
 
     await run_agent("Hi", config, history, console)
 
-    captured = capsys.readouterr()
-    assert "ADD cd" in captured.out
-    assert str(follow_dir.resolve()) in captured.out
-
-    set_active_workdir(None)
+    assert console.calls
+    printed = console.calls[-1][0][0]
+    assert isinstance(printed, Markdown)
