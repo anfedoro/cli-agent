@@ -265,11 +265,12 @@ _cli_agent_refresh_history
 
 _cli_agent_select_history_mode() {
   local prefix="${CLI_AGENT_PREFIX}"
-  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+  local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
+  if [[ "$trimmed" == "${prefix}"* ]]; then
     _cli_agent_history_mode="nl"
     return
   fi
-  if [[ -n "$READLINE_LINE" ]]; then
+  if [[ -n "$trimmed" ]]; then
     _cli_agent_history_mode="shell"
   fi
 }
