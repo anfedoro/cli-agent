@@ -10,6 +10,7 @@ _cli_agent_history_file="${CLI_AGENT_HISTORY_DIR}/${CLI_AGENT_SESSION}/nl_histor
 _cli_agent_nl_history=()
 _cli_agent_nl_index=0
 _cli_agent_shell_hist_offset=0
+_cli_agent_history_mode="shell"
 
 _cli_agent_debug() {
   [[ -z "${CLI_AGENT_DEBUG_KEYS:-}" ]] && return
@@ -29,6 +30,7 @@ _cli_agent_bind_key() {
 _cli_agent_prompt_reset() {
   _cli_agent_shell_hist_offset=0
   _cli_agent_nl_index=${#_cli_agent_nl_history[@]}
+  _cli_agent_history_mode="shell"
 }
 
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
@@ -48,6 +50,17 @@ _cli_agent_refresh_history() {
 
 _cli_agent_refresh_history
 
+_cli_agent_select_history_mode() {
+  local prefix="${CLI_AGENT_PREFIX}"
+  if [[ "$READLINE_LINE" == "${prefix}"* ]]; then
+    _cli_agent_history_mode="nl"
+    return
+  fi
+  if [[ -n "$READLINE_LINE" ]]; then
+    _cli_agent_history_mode="shell"
+  fi
+}
+
 _cli_agent_run_payload() {
   local payload="$1"
   local output
@@ -62,8 +75,8 @@ _cli_agent_run_payload() {
 
 _cli_agent_history_up() {
   local prefix="${CLI_AGENT_PREFIX}"
-  local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
-  if [[ "$trimmed" == "${prefix}" || "$trimmed" == "${prefix}"* ]]; then
+  _cli_agent_select_history_mode
+  if [[ "${_cli_agent_history_mode}" == "nl" ]]; then
     _cli_agent_debug "up" "nl"
     _cli_agent_shell_hist_offset=0
     if (( _cli_agent_nl_index > 0 )); then
@@ -92,8 +105,8 @@ _cli_agent_history_up() {
 
 _cli_agent_history_down() {
   local prefix="${CLI_AGENT_PREFIX}"
-  local trimmed="${READLINE_LINE#"${READLINE_LINE%%[![:space:]]*}"}"
-  if [[ "$trimmed" == "${prefix}" || "$trimmed" == "${prefix}"* ]]; then
+  _cli_agent_select_history_mode
+  if [[ "${_cli_agent_history_mode}" == "nl" ]]; then
     _cli_agent_debug "down" "nl"
     _cli_agent_shell_hist_offset=0
     local total=${#_cli_agent_nl_history[@]}
